@@ -87,10 +87,46 @@ describe("parseSelector — errors carry column info", () => {
     expect(e.column).toBe(2);
   });
 
-  it("reserves filter selectors '[?...]'", () => {
-    const e = errFor("$[?(@.x)]");
-    expect(e.message).toContain("filter selectors '[?...]' are reserved");
-    expect(e.column).toBe(2);
+  it("parses filter selectors (0.2 grammar)", () => {
+    expect(parseSelector("$[?(@.x)]")).toEqual([
+      { kind: "filter", conjuncts: [{ members: ["x"] }] },
+    ]);
+    expect(parseSelector("$[?@.refId == 'C']")).toEqual([
+      { kind: "filter", conjuncts: [{ members: ["refId"], op: "==", literal: "C" }] },
+    ]);
+    expect(parseSelector('$[?@.n != 3]')).toEqual([
+      { kind: "filter", conjuncts: [{ members: ["n"], op: "!=", literal: 3 }] },
+    ]);
+    expect(
+      parseSelector("$[?@.op == 'add' && @.value.name == 'POD_UID']"),
+    ).toEqual([
+      {
+        kind: "filter",
+        conjuncts: [
+          { members: ["op"], op: "==", literal: "add" },
+          { members: ["value", "name"], op: "==", literal: "POD_UID" },
+        ],
+      },
+    ]);
+    expect(parseSelector("$[?@.t == 'a]b']")).toEqual([
+      { kind: "filter", conjuncts: [{ members: ["t"], op: "==", literal: "a]b" }] },
+    ]);
+  });
+
+  it("rejects unsupported filter constructs precisely", () => {
+    expect(errFor("$[?@.a == 1 || @.b == 2]").message).toContain("'||' is not supported");
+    expect(errFor("$[?@.a < 3]").message).toContain(
+      "filter comparisons support only '==' and '!='",
+    );
+    expect(errFor("$[?match(@.a, 'x')]").message).toContain(
+      "filter functions are not supported",
+    );
+    expect(errFor("$[?@]").message).toContain("bare '@' is not a valid filter");
+    expect(errFor("$[?@.a.b.c == 1]").message).toContain("at most two members");
+    expect(errFor("$[?@.a == @.b]").message).toContain(
+      "against a number or quoted string literal",
+    );
+    expect(errFor("$[?@.a == bare]").message).toContain("invalid filter literal");
   });
 
   it("reserves slice selectors '[a:b]'", () => {

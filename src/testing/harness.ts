@@ -40,6 +40,8 @@ const caseSchema = z.strictObject({
           kind: z.string().optional(),
           line: z.number().optional(),
           messageIncludes: z.string().optional(),
+          nodeId: z.string().optional(),
+          docPath: z.string().optional(),
         }),
       )
       .default([]),
@@ -112,7 +114,9 @@ export async function runFixtureCase(
         f.locator.file === exp.file &&
         (exp.kind === undefined || f.kind === exp.kind) &&
         (exp.line === undefined || f.locator.line === exp.line) &&
-        (exp.messageIncludes === undefined || f.message.includes(exp.messageIncludes)),
+        (exp.messageIncludes === undefined || f.message.includes(exp.messageIncludes)) &&
+        (exp.nodeId === undefined || f.locator.nodeId === exp.nodeId) &&
+        (exp.docPath === undefined || f.locator.docPath === exp.docPath),
     );
     if (idx === -1) {
       problems.push(`expected finding not produced: ${JSON.stringify(exp)}`);

@@ -1,31 +1,26 @@
 import { z } from "zod";
 import { defineRule } from "../../rule/define.js";
-import type { DocNode } from "../../structured/doc.js";
-import type { Locator } from "../../rule/types.js";
-
-const assertion = z.strictObject({
-  /** Node-relative selector for the value(s) under test. */
-  path: z.string().min(1),
-  required: z.boolean().optional(),
-  absent: z.boolean().optional(),
-  eq: z.unknown().optional(),
-  regex: z.string().optional(),
-  enum: z.array(z.unknown()).optional(),
-  contains: z.string().optional(),
-  notContains: z.string().optional(),
-});
+import { comparePaths } from "../../structured/doc.js";
+import { selectorString } from "../../selector/schema.js";
+import { assertion, runAssertion } from "../shared/asserts.js";
 
 const options = z.strictObject({
   parse: z.enum(["yaml", "yaml-multi", "json", "frontmatter"]),
   /** Selector for the nodes each assertion runs against. */
-  select: z.string().min(1),
+  select: selectorString,
   /** Fail (kind: absence) when `select` matches no node in a file. */
   requireMatch: z.boolean().default(false),
   assert: z.array(assertion).min(1),
+  /**
+   * Document-order constraints, evaluated against the document root: every
+   * node matched by `before` must precede every node matched by `after`.
+   */
+  order: z
+    .array(z.strictObject({ before: selectorString, after: selectorString }))
+    .default([]),
 });
 
 type Options = z.infer<typeof options>;
-type Assertion = z.infer<typeof assertion>;
 
 export const nodesRule = defineRule<Options>({
   type: "nodes",
@@ -52,103 +47,39 @@ export const nodesRule = defineRule<Options>({
       }
       for (const node of selected) {
         for (const a of ctx.options.assert) {
-          checkAssertion(ctx, target.relPath, node, a);
+          runAssertion((f) => ctx.report(f), target.relPath, node, a);
+        }
+      }
+      for (const o of ctx.options.order) {
+        const befores = doc.select(o.before);
+        const afters = doc.select(o.after);
+        if (befores.length === 0 || afters.length === 0) {
+          ctx.report({
+            kind: "absence",
+            message:
+              befores.length === 0
+                ? `order constraint: ${o.before} matched no node`
+                : `order constraint: ${o.after} matched no node`,
+            locator: { file: target.relPath },
+            expected: "both order selectors match at least one node",
+            found: befores.length === 0 ? `${o.before}: no match` : `${o.after}: no match`,
+          });
+          continue;
+        }
+        for (const b of befores) {
+          for (const a of afters) {
+            if (comparePaths(b.path, a.path) >= 0) {
+              ctx.report({
+                kind: "mismatch",
+                message: `order violation: ${o.before} must precede ${o.after}`,
+                locator: { ...a.locator, file: target.relPath },
+                expected: `${o.before} before ${o.after}`,
+                found: `${b.locator.docPath ?? "?"} at or after ${a.locator.docPath ?? "?"}`,
+              });
+            }
+          }
         }
       }
     }
   },
 });
-
-function checkAssertion(
-  ctx: Parameters<NonNullable<(typeof nodesRule)["check"]>>[0],
-  file: string,
-  node: DocNode,
-  a: Assertion,
-): void {
-  const values = node.select(a.path);
-  const at = (loc: Locator): Locator => ({ ...loc, file });
-
-  if (a.required === true && values.length === 0) {
-    ctx.report({
-      kind: "absence",
-      message: `required value ${a.path} is missing`,
-      locator: at(node.locator),
-      expected: a.path,
-      found: "missing",
-    });
-    return;
-  }
-  if (a.absent === true && values.length > 0) {
-    for (const v of values) {
-      ctx.report({
-        kind: "forbidden",
-        message: `forbidden value ${a.path} is present`,
-        locator: at(v.locator),
-        expected: "absent",
-        found: render(v.value),
-      });
-    }
-    return;
-  }
-
-  for (const v of values) {
-    const value = v.value;
-    if (a.eq !== undefined && !deepEqual(value, a.eq)) {
-      ctx.report({
-        kind: "mismatch",
-        message: `${a.path} has the wrong value`,
-        locator: at(v.locator),
-        expected: render(a.eq),
-        found: render(value),
-      });
-    }
-    if (a.regex !== undefined && !new RegExp(a.regex).test(String(value))) {
-      ctx.report({
-        kind: "mismatch",
-        message: `${a.path} does not match /${a.regex}/`,
-        locator: at(v.locator),
-        expected: `match /${a.regex}/`,
-        found: render(value),
-      });
-    }
-    if (a.enum !== undefined && !a.enum.some((e) => deepEqual(value, e))) {
-      ctx.report({
-        kind: "mismatch",
-        message: `${a.path} is not one of the allowed values`,
-        locator: at(v.locator),
-        expected: a.enum.map(render).join(" | "),
-        found: render(value),
-      });
-    }
-    if (a.contains !== undefined && !String(value).includes(a.contains)) {
-      ctx.report({
-        kind: "mismatch",
-        message: `${a.path} does not contain the required substring`,
-        locator: at(v.locator),
-        expected: `contains ${JSON.stringify(a.contains)}`,
-        found: render(value),
-      });
-    }
-    if (a.notContains !== undefined && String(value).includes(a.notContains)) {
-      ctx.report({
-        kind: "forbidden",
-        message: `${a.path} contains a forbidden substring`,
-        locator: at(v.locator),
-        expected: `does not contain ${JSON.stringify(a.notContains)}`,
-        found: render(value),
-      });
-    }
-  }
-}
-
-function render(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value);
-  return JSON.stringify(value) ?? String(value);
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (typeof a !== typeof b || a === null || b === null) return false;
-  if (typeof a !== "object") return false;
-  return JSON.stringify(a) === JSON.stringify(b);
-}
