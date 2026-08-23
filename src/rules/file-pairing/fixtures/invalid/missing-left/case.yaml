@@ -1,0 +1,10 @@
+# bidirectional defaults to true: a lone right file is also a violation.
+options:
+  left: AGENTS.md
+  right: CLAUDE.md
+expected:
+  outcome: error
+  findings:
+    - file: CLAUDE.md
+      kind: absence
+      messageIncludes: has no sibling AGENTS.md

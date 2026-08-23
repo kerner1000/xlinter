@@ -1,0 +1,10 @@
+version: 1
+discovery: walk
+ignore:
+  - .xlinter.yaml
+  - base.yaml
+extends:
+  - ./base.yaml
+rules:
+  local/doc-names:
+    severity: warn

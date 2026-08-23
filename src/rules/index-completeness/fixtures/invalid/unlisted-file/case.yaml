@@ -1,0 +1,10 @@
+options:
+  index: INDEX.md
+  scope:
+    include: ["*.md"]
+expected:
+  outcome: error
+  findings:
+    - file: b.md
+      kind: absence
+      messageIncludes: not linked from INDEX.md

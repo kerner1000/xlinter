@@ -1,0 +1,10 @@
+options:
+  pattern: '^.+$'
+include: ["*.md"]
+expected:
+  outcome: error
+  findings:
+    - file: no-heading.md
+      kind: absence
+      line: 1
+      messageIncludes: no first-level heading

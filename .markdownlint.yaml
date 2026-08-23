@@ -1,0 +1,11 @@
+# markdownlint configuration for xlinter's own repository (dogfood).
+default: true
+# Line length: docs carry long tables and URLs; keep prose readable without fighting tables.
+MD013:
+  line_length: 120
+  tables: false
+  code_blocks: false
+# Inline HTML is allowed (badges in README).
+MD033: false
+# First line does not need to be a top-level heading in fixture files, but those are
+# excluded via .xlinter.yaml; keep the rule on for real docs.

@@ -1,0 +1,8 @@
+options:
+  pattern: '^[a-z0-9-]+\.md$'
+expected:
+  outcome: error
+  findings:
+    - file: Bad_Name.md
+      kind: mismatch
+      messageIncludes: does not match the required pattern

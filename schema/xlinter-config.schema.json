@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "engine": {
+      "type": "string"
+    },
+    "namespace": {
+      "default": "local",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "extends": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "roots": {
+      "default": [
+        {
+          "path": ".",
+          "kind": "repo"
+        }
+      ],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "kind": {
+            "default": "repo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "discovery": {
+      "default": "auto",
+      "type": "string",
+      "enum": [
+        "auto",
+        "tracked",
+        "walk"
+      ]
+    },
+    "ignore": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rules": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warn",
+                  "note"
+                ]
+              },
+              "targets": {
+                "type": "object",
+                "properties": {
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "onEmpty": {
+                "type": "string",
+                "enum": [
+                  "na",
+                  "warn",
+                  "error"
+                ]
+              }
+            },
+            "additionalProperties": {}
+          },
+          {
+            "type": "string",
+            "const": "off"
+          }
+        ]
+      }
+    },
+    "exemptions": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "issue": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule",
+          "file",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "adapters": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "markdownlint": {
+          "type": "object",
+          "properties": {
+            "config": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              ]
+            },
+            "severity": {
+              "default": "error",
+              "type": "string",
+              "enum": [
+                "error",
+                "warn",
+                "note"
+              ]
+            },
+            "rules": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "error",
+                      "warn",
+                      "note"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "const": "off"
+                  }
+                ]
+              }
+            },
+            "onUnavailable": {
+              "default": "error",
+              "type": "string",
+              "enum": [
+                "error",
+                "skipped"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "plugins": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "additionalProperties": false,
+  "$id": "https://github.com/kerner1000/xlinter/blob/main/schema/xlinter-config.schema.json",
+  "title": "xlinter configuration (.xlinter.yaml)",
+  "$defs": {
+    "ruleType:file-name": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allow": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "ruleType:file-pairing": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "left": {
+          "type": "string",
+          "minLength": 1
+        },
+        "right": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bidirectional": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "left",
+        "right"
+      ],
+      "additionalProperties": false
+    },
+    "ruleType:first-heading": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "ruleType:index-completeness": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "index": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exclude": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "include"
+          ],
+          "additionalProperties": false
+        },
+        "direction": {
+          "default": "both",
+          "type": "string",
+          "enum": [
+            "both",
+            "files-to-index",
+            "index-to-files"
+          ]
+        }
+      },
+      "required": [
+        "index",
+        "scope"
+      ],
+      "additionalProperties": false
+    },
+    "ruleType:nodes": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "parse": {
+          "type": "string",
+          "enum": [
+            "yaml",
+            "yaml-multi",
+            "json",
+            "frontmatter"
+          ]
+        },
+        "select": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requireMatch": {
+          "default": false,
+          "type": "boolean"
+        },
+        "assert": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "absent": {
+                "type": "boolean"
+              },
+              "eq": {},
+              "regex": {
+                "type": "string"
+              },
+              "enum": {
+                "type": "array",
+                "items": {}
+              },
+              "contains": {
+                "type": "string"
+              },
+              "notContains": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "parse",
+        "select",
+        "assert"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

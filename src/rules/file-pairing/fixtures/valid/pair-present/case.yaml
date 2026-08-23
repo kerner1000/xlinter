@@ -1,0 +1,6 @@
+options:
+  left: AGENTS.md
+  right: CLAUDE.md
+expected:
+  outcome: pass
+  findings: []

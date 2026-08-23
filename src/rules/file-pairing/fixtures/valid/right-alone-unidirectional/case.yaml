@@ -1,0 +1,8 @@
+# With bidirectional off, a lone right file requires nothing.
+options:
+  left: AGENTS.md
+  right: CLAUDE.md
+  bidirectional: false
+expected:
+  outcome: pass
+  findings: []

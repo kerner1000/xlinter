@@ -1,0 +1,66 @@
+{
+  "name": "xlinter",
+  "version": "0.1.0",
+  "description": "Agent-first repository-policy and agent-workspace linter engine",
+  "keywords": [
+    "lint",
+    "linter",
+    "repository-policy",
+    "agents",
+    "agents-md",
+    "ai-workspace",
+    "markdown",
+    "yaml",
+    "policy"
+  ],
+  "license": "Apache-2.0",
+  "author": "Alexander Kerner",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kerner1000/xlinter.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "xlinter": "dist/cli/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/harness.d.ts",
+      "default": "./dist/testing/harness.js"
+    },
+    "./schema.json": "./schema/xlinter-config.schema.json"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "schema",
+    "src/rules/*/fixtures",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "npm run build && tsc -p tsconfig.json && vitest run",
+    "schema": "npm run build && node dist/tools/generate-schema.js",
+    "lint:self": "npm run build && node dist/cli/main.js .",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "ignore": "^7.0.6",
+    "markdownlint": "0.41.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

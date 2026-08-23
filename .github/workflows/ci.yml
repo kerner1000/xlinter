@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx vitest run
+      - name: self-lint
+        run: node dist/cli/main.js . --format json > /dev/null && node dist/cli/main.js .
+      - name: rule docs complete
+        run: node dist/cli/main.js rules --check-docs
+      - name: schema not stale
+        run: |
+          node dist/tools/generate-schema.js
+          git diff --exit-code -- schema/xlinter-config.schema.json

@@ -1,0 +1,13 @@
+options:
+  parse: yaml
+  select: '$.service'
+  assert:
+    - path: '$.port'
+      required: true
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: config.yaml
+      kind: absence
+      messageIncludes: required value $.port is missing

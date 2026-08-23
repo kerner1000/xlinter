@@ -1,0 +1,7 @@
+options:
+  index: INDEX.md
+  scope:
+    include: ["*.md"]
+expected:
+  outcome: pass
+  findings: []

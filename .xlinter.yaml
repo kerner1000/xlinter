@@ -1,0 +1,60 @@
+# xlinter's own policy — the dogfood config shipped in the bootstrap commit.
+# Every rule here is load-bearing: doc pages must exist, be indexed, be named
+# after their rule, and carry machine-readable frontmatter; the agent files
+# must stay paired; package.json must keep its public contract.
+version: 1
+engine: ">=0.1.0"
+namespace: xlinter
+discovery: tracked
+ignore:
+  - "dist/**"
+  - "node_modules/**"
+  - "src/rules/*/fixtures/**"
+  - "test/integration/repos/**"
+rules:
+  rule-doc-names:
+    type: file-name
+    targets: { include: ["docs/rules/*.md", "docs/adapters/*.md"] }
+    pattern: '^[a-z0-9]+(-[a-z0-9]+)*\.md$'
+    allow: [README.md]
+  rule-doc-frontmatter:
+    type: nodes
+    targets: { include: ["docs/rules/*.md"], exclude: ["docs/rules/README.md"] }
+    parse: frontmatter
+    select: "$"
+    requireMatch: true
+    assert:
+      - path: "$.ruleId"
+        required: true
+        regex: '^[a-z0-9-]+$'
+      - path: "$.defaultSeverity"
+        required: true
+        enum: [error, warn, note]
+  rule-doc-title:
+    type: first-heading
+    targets: { include: ["docs/rules/*.md"], exclude: ["docs/rules/README.md"] }
+    pattern: '^${stem}$'
+  rule-doc-index:
+    type: index-completeness
+    targets: { include: ["docs/rules/*.md"] }
+    index: docs/rules/README.md
+    scope: { include: ["docs/rules/*.md"] }
+    direction: both
+  agent-files:
+    type: file-pairing
+    targets: { include: ["AGENTS.md", "CLAUDE.md"] }
+    left: AGENTS.md
+    right: CLAUDE.md
+  package-contract:
+    type: nodes
+    targets: { include: ["package.json"] }
+    parse: json
+    select: "$"
+    assert:
+      - { path: "$.license", eq: "Apache-2.0" }
+      - { path: "$.type", eq: "module" }
+      - { path: "$.engines.node", eq: ">=22" }
+adapters:
+  markdownlint:
+    config: .markdownlint.yaml
+    severity: error

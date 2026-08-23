@@ -1,0 +1,16 @@
+version: 1
+discovery: walk
+ignore:
+  - .xlinter.yaml
+rules:
+  doc-names:
+    type: file-name
+    targets:
+      include: ["docs/*.md"]
+    pattern: "^[a-z0-9][a-z0-9-]*\\.md$"
+  never-matches:
+    type: file-name
+    targets:
+      include: ["nonexistent/**"]
+    onEmpty: na
+    pattern: ".*"

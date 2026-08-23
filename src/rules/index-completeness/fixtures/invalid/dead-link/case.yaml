@@ -1,0 +1,11 @@
+options:
+  index: INDEX.md
+  scope:
+    include: ["*.md"]
+expected:
+  outcome: error
+  findings:
+    - file: INDEX.md
+      kind: mismatch
+      line: 4
+      messageIncludes: does not exist

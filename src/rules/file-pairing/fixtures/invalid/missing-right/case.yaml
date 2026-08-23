@@ -1,0 +1,9 @@
+options:
+  left: AGENTS.md
+  right: CLAUDE.md
+expected:
+  outcome: error
+  findings:
+    - file: AGENTS.md
+      kind: absence
+      messageIncludes: has no sibling CLAUDE.md

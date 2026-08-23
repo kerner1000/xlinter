@@ -1,0 +1,14 @@
+# Non-YAML parse: the markdown file's frontmatter block is the document.
+options:
+  parse: frontmatter
+  select: '$'
+  requireMatch: true
+  assert:
+    - path: '$.title'
+      required: true
+    - path: '$.status'
+      enum: [proposed, adopted]
+include: ["*.md"]
+expected:
+  outcome: pass
+  findings: []

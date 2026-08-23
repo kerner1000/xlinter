@@ -1,0 +1,7 @@
+# ${stem} is substituted with the regex-escaped filename stem.
+options:
+  pattern: '^${stem}$'
+include: ["*.md"]
+expected:
+  outcome: pass
+  findings: []

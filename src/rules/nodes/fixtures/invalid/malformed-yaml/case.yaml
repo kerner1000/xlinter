@@ -1,0 +1,14 @@
+# Malformed target content is a deterministic parse-error finding.
+options:
+  parse: yaml
+  select: '$'
+  assert:
+    - path: '$.items'
+      required: true
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: broken.yaml
+      kind: parse-error
+      messageIncludes: cannot parse target

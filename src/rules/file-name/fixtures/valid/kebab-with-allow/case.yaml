@@ -1,0 +1,8 @@
+options:
+  pattern: '^[a-z0-9-]+\.md$'
+  allow: ["WEIRD.md"]
+include: ["*.md"]
+exclude: ["drafts/"]
+expected:
+  outcome: pass
+  findings: []

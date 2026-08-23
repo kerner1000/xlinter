@@ -1,0 +1,28 @@
+version: 1
+discovery: walk
+ignore:
+  - .xlinter.yaml
+rules:
+  doc-names:
+    type: file-name
+    targets:
+      include: ["docs/*.md"]
+    pattern: "^[a-z0-9][a-z0-9-]*\\.md$"
+  app-config:
+    type: nodes
+    targets:
+      include: ["config/app.yaml"]
+    parse: yaml
+    select: "$"
+    assert:
+      - path: "$.name"
+        required: true
+  broken-yaml:
+    type: nodes
+    targets:
+      include: ["broken.yaml"]
+    parse: yaml
+    select: "$"
+    assert:
+      - path: "$.name"
+        required: true

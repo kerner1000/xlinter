@@ -1,0 +1,15 @@
+version: 1
+discovery: walk
+ignore:
+  - .xlinter.yaml
+rules:
+  pairing:
+    type: file-pairing
+    targets:
+      include: ["AGENTS.md", "CLAUDE.md"]
+    left: AGENTS.md
+    right: CLAUDE.md
+exemptions:
+  - rule: local/pairing
+    file: AGENTS.md
+    reason: CLAUDE.md is intentionally absent in this fixture

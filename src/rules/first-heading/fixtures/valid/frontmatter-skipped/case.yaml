@@ -1,0 +1,7 @@
+# The "# ..." comment inside the frontmatter block must not be taken as the H1.
+options:
+  pattern: '^hello$'
+include: ["*.md"]
+expected:
+  outcome: pass
+  findings: []

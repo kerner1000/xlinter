@@ -1,0 +1,10 @@
+# The allow list exempts KEEP.md but must not leak onto WRONG-Case.md.
+options:
+  pattern: '^[a-z0-9-]+\.md$'
+  allow: ["KEEP.md"]
+expected:
+  outcome: error
+  findings:
+    - file: WRONG-Case.md
+      kind: mismatch
+      messageIncludes: does not match the required pattern

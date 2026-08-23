@@ -1,0 +1,14 @@
+options:
+  parse: yaml
+  select: '$.service'
+  requireMatch: true
+  assert:
+    - path: '$.name'
+      required: true
+      regex: '^[a-z]+$'
+    - path: '$.port'
+      eq: 8100
+include: ["*.yaml"]
+expected:
+  outcome: pass
+  findings: []

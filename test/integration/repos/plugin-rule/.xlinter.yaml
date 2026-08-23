@@ -1,0 +1,7 @@
+version: 1
+discovery: walk
+plugins:
+  - ./rules/pack.js
+rules:
+  always:
+    type: always-fails

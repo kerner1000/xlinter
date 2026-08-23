@@ -1,0 +1,10 @@
+options:
+  pattern: '^${stem}$'
+include: ["*.md"]
+expected:
+  outcome: error
+  findings:
+    - file: beta.md
+      kind: mismatch
+      line: 1
+      messageIncludes: does not match the required pattern

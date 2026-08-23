@@ -1,0 +1,14 @@
+options:
+  parse: yaml
+  select: '$.service'
+  assert:
+    - path: '$.port'
+      eq: 8100
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: config.yaml
+      kind: mismatch
+      line: 3
+      messageIncludes: has the wrong value
