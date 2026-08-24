@@ -1,0 +1,2 @@
+The response carries status_code=401 when auth fails.
+See xgenerate-docs and xgenerate.io for the code form conventions.

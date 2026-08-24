@@ -1,0 +1,10 @@
+options:
+  require:
+    - "## Dead extraction rows"
+    - "## Lane saturation"
+expected:
+  outcome: error
+  findings:
+    - file: RUNBOOK.md
+      kind: absence
+      messageIncludes: required text "## Lane saturation" not found

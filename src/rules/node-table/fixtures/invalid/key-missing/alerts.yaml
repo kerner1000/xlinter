@@ -1,0 +1,5 @@
+groups:
+  - name: g
+    rules:
+      - title: no uid here
+        state: OK

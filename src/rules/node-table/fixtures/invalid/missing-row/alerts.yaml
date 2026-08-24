@@ -1,0 +1,5 @@
+groups:
+  - name: g
+    rules:
+      - uid: present-rule
+        state: OK

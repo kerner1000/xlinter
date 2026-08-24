@@ -1,0 +1,15 @@
+options:
+  left:
+    file: services.yaml
+    parse: yaml
+    select: '$.services[*]'
+    value: '$.name'
+    key: '$.name'
+  right:
+    file: registry.yaml
+    parse: yaml
+    value: '$.allowed'
+  relation: memberOf
+expected:
+  outcome: pass
+  findings: []

@@ -1,0 +1,7 @@
+options:
+  require:
+    - "## Dead extraction rows"
+    - "## Lane saturation"
+expected:
+  outcome: pass
+  findings: []

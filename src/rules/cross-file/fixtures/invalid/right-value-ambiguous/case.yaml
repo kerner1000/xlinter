@@ -1,0 +1,18 @@
+options:
+  left:
+    file: left.yaml
+    parse: yaml
+    select: '$.item'
+    value: '$.ref'
+  right:
+    file: right.yaml
+    parse: yaml
+    select: '$.entries[*]'
+    value: '$.id'
+  relation: eq
+expected:
+  outcome: error
+  findings:
+    - file: right.yaml
+      kind: other
+      messageIncludes: right value ambiguous

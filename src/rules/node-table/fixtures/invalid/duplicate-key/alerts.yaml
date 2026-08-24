@@ -1,0 +1,7 @@
+groups:
+  - name: g
+    rules:
+      - uid: twin
+        state: OK
+      - uid: twin
+        state: OK

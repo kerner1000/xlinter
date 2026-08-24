@@ -1,0 +1,12 @@
+options:
+  parse: yaml
+  select: "$.groups[*].rules[*]"
+  key: "$.uid"
+  common:
+    - { path: "$.state", eq: OK }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: absence
+      messageIncludes: row key $.uid is missing

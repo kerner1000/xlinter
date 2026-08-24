@@ -1,0 +1,19 @@
+options:
+  left:
+    file: alerts.yaml
+    parse: yaml
+    select: '$.groups[*].rules[*]'
+    value: '$.annotations.dashboard_url'
+    key: '$.uid'
+  right:
+    file: dashboard.json
+    parse: json
+    value: '$.uid'
+  relation: contains
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: mismatch
+      nodeId: rule-a
+      messageIncludes: 'relation: contains'

@@ -1,0 +1,6 @@
+groups:
+  - name: ocr
+    rules:
+      - uid: rule-a
+        annotations:
+          dashboard_url: https://grafana.example/d/other-dash/view

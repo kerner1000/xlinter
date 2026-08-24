@@ -1,0 +1,14 @@
+options:
+  parse: yaml
+  select: "$.groups[*].rules[*]"
+  key: "$.uid"
+  rows:
+    twin:
+      state: { eq: OK }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: other
+      nodeId: twin
+      messageIncludes: first defined at

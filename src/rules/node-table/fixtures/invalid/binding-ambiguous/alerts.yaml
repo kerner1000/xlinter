@@ -1,0 +1,9 @@
+groups:
+  - name: g
+    rules:
+      - uid: double-c
+        data:
+          - refId: C
+            model: { expression: "$B >= 1" }
+          - refId: C
+            model: { expression: "$B >= 2" }

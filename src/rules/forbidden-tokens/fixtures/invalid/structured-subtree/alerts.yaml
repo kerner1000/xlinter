@@ -1,0 +1,12 @@
+groups:
+  - name: otp
+    rules:
+      - uid: r1
+        annotations:
+          summary: request failed with status_code=401
+          description: sent code=123456 to the user
+  - name: unrelated
+    rules:
+      - uid: r2
+        annotations:
+          summary: code=999 lives outside the selected group

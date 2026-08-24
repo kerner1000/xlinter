@@ -1,0 +1,2 @@
+endpoint: https://api.example
+debug_mode: enabled

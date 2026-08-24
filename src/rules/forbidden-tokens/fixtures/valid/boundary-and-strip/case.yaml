@@ -1,0 +1,8 @@
+options:
+  tokens: ["code=", "xgenerate"]
+  boundary: word
+  stripAllowed:
+    - 'xgenerate[-_/:.]'
+expected:
+  outcome: pass
+  findings: []

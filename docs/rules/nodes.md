@@ -27,25 +27,40 @@ robust against reformatting, reordering, and quoting changes.
 | `select`       | `string`  | —       | Required. Selector for the nodes each assertion runs against.        |
 | `requireMatch` | `boolean` | `false` | Report an `absence` finding when `select` matches no node in a file. |
 | `assert`       | `array`   | —       | Required (min 1). Assertions, each applied to every selected node.   |
+| `order`        | `array`   | `[]`    | Document-order constraints: `{before, after}` selector pairs.        |
 
 Each entry of `assert` names a node-relative `path` (required; `$` re-roots at the selected node)
 plus any of these checks:
 
-| Assertion     | Type      | Fires when                                     | Finding kind |
-| ------------- | --------- | ---------------------------------------------- | ------------ |
-| `required`    | `boolean` | `true` and no value exists at `path`           | `absence`    |
-| `absent`      | `boolean` | `true` and any value exists at `path`          | `forbidden`  |
-| `eq`          | any       | the value is not deep-equal to the given value | `mismatch`   |
-| `regex`       | `string`  | the stringified value does not match the regex | `mismatch`   |
-| `enum`        | `array`   | the value is deep-equal to none of the entries | `mismatch`   |
-| `contains`    | `string`  | the stringified value lacks the substring      | `mismatch`   |
-| `notContains` | `string`  | the stringified value contains the substring   | `forbidden`  |
+| Assertion       | Type      | Fires when                                           | Finding kind |
+| --------------- | --------- | ---------------------------------------------------- | ------------ |
+| `required`      | `boolean` | `true` and no value exists at `path`                 | `absence`    |
+| `absent`        | `boolean` | `true` and any value exists at `path`                | `forbidden`  |
+| `eq`            | any       | the value is not deep-equal to the given value       | `mismatch`   |
+| `regex`         | `string`  | the stringified value does not match the regex       | `mismatch`   |
+| `enum`          | `array`   | the value is deep-equal to none of the entries       | `mismatch`   |
+| `contains`      | `string`  | the stringified value lacks the substring            | `mismatch`   |
+| `notContains`   | `string`  | the stringified value contains the substring         | `forbidden`  |
+| `notMatch`      | `string`  | the stringified value matches the regex              | `forbidden`  |
+| `containsCount` | `object`  | `substring` occurs a number of times other than `eq` | `mismatch`   |
+| `scan`          | `object`  | extraction-based checks fail (see below)             | varies       |
 
 Evaluation notes:
 
 - Selectors use the owned JSONPath subset: `$` (root), `.name` / `['name']` (named child),
-  `[0]` (index; negative counts from the end), and `[*]` / `.*` (wildcard). Filters (`[?...]`),
-  recursive descent (`..`), slices, and unions are reserved and rejected as config errors.
+  `[0]` (index; negative counts from the end), `[*]` / `.*` (wildcard), and filters
+  `[?@.field]`, `[?@.field == 'value']`, `[?@.a != 3]`, conjoined with `&&` (`@.a` or `@.a.b`
+  paths, number or quoted-string literals only). Recursive descent (`..`), slices, and unions
+  are reserved and rejected as config errors.
+- `scan` extracts every match of a regex (optionally a capture `group`, optionally `split` on a
+  delimiter) from each value and then asserts: `first` (checks on the first extraction), `each`
+  (checks on every extraction), `setEq` (the deduplicated set of all extractions across every
+  matched value equals exactly the given set — an empty extraction set fails a non-empty
+  expectation). With `each`/`first`, at least one extraction is required unless
+  `allowEmpty: true`; `minCount` overrides the threshold.
+- `order` entries are evaluated against the document root of each file: every node matched by
+  `before` must precede every node matched by `after` in document order. Either selector
+  matching nothing is an `absence` finding.
 - With `parse: yaml-multi`, `select` runs across all documents in the file.
 - A failing `required` or `absent` check short-circuits the remaining checks of that assertion;
   the value checks (`eq`, `regex`, `enum`, `contains`, `notContains`) each run against every value

@@ -1,0 +1,16 @@
+options:
+  parse: yaml
+  select: "$.groups[*].rules[*]"
+  key: "$.uid"
+  rows:
+    present-rule:
+      state: { eq: OK }
+    absent-rule:
+      state: { eq: OK }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: absence
+      nodeId: absent-rule
+      messageIncludes: expected row "absent-rule" not found

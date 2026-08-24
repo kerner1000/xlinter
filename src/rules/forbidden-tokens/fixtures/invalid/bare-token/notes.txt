@@ -1,0 +1,2 @@
+First line is fine.
+The one-time code=123456 must never appear in an annotation.

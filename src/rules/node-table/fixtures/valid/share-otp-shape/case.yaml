@@ -1,0 +1,26 @@
+options:
+  parse: yaml
+  select: "$.groups[?@.name == 'docflow-share-otp'].rules[*]"
+  key: "$.uid"
+  closedWorld: true
+  columns:
+    threshold: { path: "$.data[?@.refId == 'C'].model.expression" }
+    expr: { path: "$.data[?@.refId == 'A'].model.expr" }
+  common:
+    - { path: "$.noDataState", eq: OK }
+  rows:
+    verify-abuse:
+      threshold: { eq: "$B >= 15" }
+      expr:
+        contains: 'outcome =~'
+        scan: { extract: '\[[0-9]+[smhd]\]', setEq: ["[15m]"] }
+    send-pressure:
+      threshold: { eq: "$B >= 10" }
+      expr:
+        scan: { extract: '\[[0-9]+[smhd]\]', setEq: ["[30m]"] }
+    dispatch-drop:
+      threshold: { eq: "$B >= 1" }
+      expr: { contains: 'queued = "false"' }
+expected:
+  outcome: pass
+  findings: []

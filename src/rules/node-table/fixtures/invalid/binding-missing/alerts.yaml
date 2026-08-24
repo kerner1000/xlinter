@@ -1,0 +1,7 @@
+groups:
+  - name: g
+    rules:
+      - uid: no-threshold
+        data:
+          - refId: A
+            model: { expr: "up == 1" }

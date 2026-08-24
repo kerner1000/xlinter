@@ -1,0 +1,17 @@
+options:
+  left:
+    file: nonexistent.yaml
+    parse: yaml
+    select: '$'
+    value: '$.uid'
+  right:
+    file: right.yaml
+    parse: yaml
+    value: '$.uid'
+  relation: eq
+expected:
+  outcome: error
+  findings:
+    - file: nonexistent.yaml
+      kind: absence
+      messageIncludes: is not among this instance's targets

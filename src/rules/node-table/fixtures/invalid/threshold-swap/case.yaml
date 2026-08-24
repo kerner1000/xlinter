@@ -1,0 +1,27 @@
+options:
+  parse: yaml
+  select: "$.groups[?@.name == 'docflow-share-otp'].rules[*]"
+  key: "$.uid"
+  closedWorld: true
+  columns:
+    threshold: { path: "$.data[?@.refId == 'C'].model.expression" }
+  common:
+    - { path: "$.noDataState", eq: OK }
+  rows:
+    verify-abuse:
+      threshold: { eq: "$B >= 15" }
+    send-pressure:
+      threshold: { eq: "$B >= 10" }
+    dispatch-drop:
+      threshold: { eq: "$B >= 1" }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: mismatch
+      nodeId: verify-abuse
+      messageIncludes: 'row "verify-abuse"'
+    - file: alerts.yaml
+      kind: mismatch
+      nodeId: send-pressure
+      messageIncludes: 'row "send-pressure"'

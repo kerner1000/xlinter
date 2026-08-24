@@ -1,0 +1,16 @@
+options:
+  parse: yaml
+  select: "$.groups[*].rules[*]"
+  key: "$.uid"
+  columns:
+    threshold: { path: "$.data[?@.refId == 'C'].model.expression" }
+  rows:
+    no-threshold:
+      threshold: { eq: "$B >= 1" }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: absence
+      nodeId: no-threshold
+      messageIncludes: column "threshold" binding missing

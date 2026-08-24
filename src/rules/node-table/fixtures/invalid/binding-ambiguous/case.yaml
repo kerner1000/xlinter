@@ -1,0 +1,16 @@
+options:
+  parse: yaml
+  select: "$.groups[*].rules[*]"
+  key: "$.uid"
+  columns:
+    threshold: { path: "$.data[?@.refId == 'C'].model.expression" }
+  rows:
+    double-c:
+      threshold: { eq: "$B >= 1" }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: other
+      nodeId: double-c
+      messageIncludes: column "threshold" binding ambiguous

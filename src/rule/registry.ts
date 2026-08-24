@@ -2,18 +2,26 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { RuleDescriptor } from "./types.js";
 import { XlinterConfigError } from "../config/types.js";
+import { crossFileRule } from "../rules/cross-file/rule.js";
 import { fileNameRule } from "../rules/file-name/rule.js";
 import { filePairingRule } from "../rules/file-pairing/rule.js";
 import { firstHeadingRule } from "../rules/first-heading/rule.js";
+import { forbiddenTokensRule } from "../rules/forbidden-tokens/rule.js";
 import { indexCompletenessRule } from "../rules/index-completeness/rule.js";
 import { nodesRule } from "../rules/nodes/rule.js";
+import { nodeTableRule } from "../rules/node-table/rule.js";
+import { textRule } from "../rules/text/rule.js";
 
 export const builtinRules: readonly RuleDescriptor<never>[] = [
+  crossFileRule,
   fileNameRule,
   filePairingRule,
   firstHeadingRule,
+  forbiddenTokensRule,
   indexCompletenessRule,
   nodesRule,
+  nodeTableRule,
+  textRule,
 ] as unknown as RuleDescriptor<never>[];
 
 export interface Registry {

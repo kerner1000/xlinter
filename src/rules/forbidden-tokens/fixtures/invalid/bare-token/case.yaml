@@ -1,0 +1,10 @@
+options:
+  tokens: ["code="]
+  boundary: word-left
+expected:
+  outcome: error
+  findings:
+    - file: notes.txt
+      kind: forbidden
+      line: 2
+      messageIncludes: forbidden token "code="

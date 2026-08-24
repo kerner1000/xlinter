@@ -1,0 +1,7 @@
+groups:
+  - name: ocr
+    rules:
+      - uid: rule-a
+        dashboardUid: dash-ocr
+      - uid: rule-b
+        dashboardUid: dash-wrong

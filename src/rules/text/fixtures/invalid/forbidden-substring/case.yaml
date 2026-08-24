@@ -1,0 +1,9 @@
+options:
+  forbid: ["debug_mode: enabled"]
+expected:
+  outcome: error
+  findings:
+    - file: config.txt
+      kind: forbidden
+      line: 2
+      messageIncludes: forbidden text

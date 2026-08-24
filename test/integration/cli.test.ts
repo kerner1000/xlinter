@@ -76,7 +76,7 @@ describe("built CLI (dist/cli/main.js)", () => {
     expect(envelope.configErrors.length).toBeGreaterThan(0);
   });
 
-  it("rules --format json exits 0 and lists the 5 builtin rule types", async () => {
+  it("rules --format json exits 0 and lists the 9 builtin rule types", async () => {
     const { code, stdout } = await runCli(["rules", "--format", "json"], projectRoot);
     expect(code).toBe(0);
     const envelope = JSON.parse(stdout) as {
@@ -84,13 +84,17 @@ describe("built CLI (dist/cli/main.js)", () => {
       ruleTypes: { type: string }[];
     };
     expect(envelope.schemaVersion).toBe(1);
-    expect(envelope.ruleTypes).toHaveLength(5);
+    expect(envelope.ruleTypes).toHaveLength(9);
     expect(envelope.ruleTypes.map((r) => r.type).sort()).toEqual([
+      "cross-file",
       "file-name",
       "file-pairing",
       "first-heading",
+      "forbidden-tokens",
       "index-completeness",
+      "node-table",
       "nodes",
+      "text",
     ]);
   });
 

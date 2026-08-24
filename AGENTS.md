@@ -25,7 +25,9 @@ for tests, zod 4 for config validation, `yaml` for parsing, `markdownlint` exact
 - Build: `npm run build`. Tests: `npm test`. Self-lint: `npm run lint:self` (must stay clean).
 - Regenerate the published config schema after changing config or rule option schemas:
   `npm run schema` (CI fails on a stale `schema/xlinter-config.schema.json`).
-- Selector grammar is deliberately minimal (`$`, `.name`, `['name']`, `[index]`, `[*]`); filter,
-  descent, slice, and union tokens are reserved with explicit errors — do not "helpfully"
-  implement them ad hoc.
+- Selector grammar is deliberately small: `$`, `.name`, `['name']`, `[index]`, `[*]`, and the
+  RFC 9535 filter subset `[?@.field]` / `[?@.field == 'lit']` / `!=` / `&&` (max two path
+  members, number or quoted-string literals). Recursive descent, slices, unions, `||`,
+  ordering comparisons, and functions are reserved or rejected with explicit errors — do not
+  "helpfully" extend the grammar ad hoc.
 - Conventional Commits.

@@ -1,0 +1,11 @@
+options:
+  tokens: ["code="]
+  boundary: word-left
+  parse: yaml
+  select: "$.groups[?@.name == 'otp']"
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: forbidden
+      messageIncludes: forbidden token "code="

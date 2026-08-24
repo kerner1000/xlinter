@@ -1,0 +1,7 @@
+groups:
+  - name: docflow
+    rules:
+      - uid: alert-latency
+        dashboardUid: dash-main
+      - uid: alert-errors
+        dashboardUid: dash-main

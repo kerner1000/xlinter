@@ -1,0 +1,4 @@
+allowed:
+  - docflow
+  - xgenerate
+  - frameflow

@@ -1,0 +1,15 @@
+options:
+  left:
+    file: alerts.yaml
+    parse: yaml
+    select: '$.groups[*].rules[*]'
+    value: '$.dashboardUid'
+    key: '$.uid'
+  right:
+    file: dashboard.json
+    parse: json
+    value: '$.uid'
+  relation: eq
+expected:
+  outcome: pass
+  findings: []

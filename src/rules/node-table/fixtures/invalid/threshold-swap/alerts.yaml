@@ -1,0 +1,30 @@
+groups:
+  - name: docflow-share-otp
+    rules:
+      - uid: verify-abuse
+        noDataState: OK
+        data:
+          - refId: A
+            model:
+              expr: 'count_over_time({app="df"} | outcome =~ "wrong|expired" [15m])'
+          - refId: C
+            model:
+              expression: '$B >= 10'
+      - uid: send-pressure
+        noDataState: OK
+        data:
+          - refId: A
+            model:
+              expr: 'count_over_time({app="df"} | outcome =~ "cooldown|budget" [30m])'
+          - refId: C
+            model:
+              expression: '$B >= 15'
+      - uid: dispatch-drop
+        noDataState: OK
+        data:
+          - refId: A
+            model:
+              expr: 'count_over_time({app="df"} | queued = "false" [15m])'
+          - refId: C
+            model:
+              expression: '$B >= 1'

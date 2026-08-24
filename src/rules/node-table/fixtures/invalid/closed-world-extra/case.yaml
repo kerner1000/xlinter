@@ -1,0 +1,15 @@
+options:
+  parse: yaml
+  select: "$.groups[*].rules[*]"
+  key: "$.uid"
+  closedWorld: true
+  rows:
+    known-rule:
+      state: { eq: OK }
+expected:
+  outcome: error
+  findings:
+    - file: alerts.yaml
+      kind: forbidden
+      nodeId: surprise-rule
+      messageIncludes: the row set is closed
