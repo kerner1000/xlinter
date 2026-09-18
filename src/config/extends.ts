@@ -2,7 +2,7 @@ import { readFile, realpath } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { resolve as resolveModule } from "import-meta-resolve";
+import { moduleResolve } from "import-meta-resolve";
 import { parse as parseYaml } from "yaml";
 import { validateRawConfig } from "./schema.js";
 import { mergeConfigs } from "./merge.js";
@@ -94,8 +94,18 @@ async function loadLayer(
 }
 
 /**
+ * Export conditions for a bare `extends` entry. Deliberately fixed: a policy
+ * file must not vary with the Node flags xlinter happens to run under, so
+ * `--conditions` is not consulted. Publish variants as subpath exports and
+ * select them explicitly (`extends: ["@acme/preset/strict"]` resolves the
+ * package's `./strict/xlinter.yaml`).
+ */
+const PRESET_CONDITIONS = new Set(["node", "import"]);
+
+/**
  * Resolve one extends entry. `./` and `../` are relative to the extending file.
- * A bare name resolves an npm preset package's exported `./xlinter.yaml`.
+ * A bare name resolves an npm preset package's exported `./xlinter.yaml`,
+ * looked up from the extending file's location (not from xlinter's install).
  * URLs are rejected (reserved for a future version).
  */
 async function resolveExtend(spec: string, fromFile: string): Promise<string> {
@@ -109,7 +119,7 @@ async function resolveExtend(spec: string, fromFile: string): Promise<string> {
     return path.resolve(path.dirname(fromFile), spec);
   }
   try {
-    const url = resolveModule(`${spec}/xlinter.yaml`, pathToFileURL(fromFile).href);
+    const url = moduleResolve(`${spec}/xlinter.yaml`, pathToFileURL(fromFile), PRESET_CONDITIONS);
     return fileURLToPath(url);
   } catch (e) {
     throw XlinterConfigError.single(

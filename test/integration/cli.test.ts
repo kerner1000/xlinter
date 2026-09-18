@@ -16,23 +16,53 @@ afterAll(async () => {
   for (const dir of presetDirs) await rm(dir, { recursive: true, force: true });
 });
 
-async function createPresetFixture(
-  exportsField: Record<string, unknown>,
-  prefix = "xlinter-preset-",
-): Promise<string> {
-  const dir = await mkdtemp(path.join(tmpdir(), prefix));
+const PRESET_EMPTY = "version: 1\nnamespace: preset\n";
+/** A preset layer that fails the engine gate when it is the one loaded. */
+const PRESET_POISON = 'version: 1\nnamespace: preset\nengine: ">=99"\n';
+/** A preset layer that contributes one rule instance when it is the one loaded. */
+const PRESET_ONE_RULE = [
+  "version: 1",
+  "namespace: preset",
+  "rules:",
+  "  docs:",
+  "    type: file-name",
+  '    targets: { include: ["*.md"] }',
+  '    pattern: "^[a-z0-9-]+[.]md$"',
+  "",
+].join("\n");
+
+interface PresetFixture {
+  /** The `exports` field of the `@acme/preset` package. */
+  exports: Record<string, unknown>;
+  /** Preset package files beside the default empty `xlinter.yaml`. */
+  files?: Record<string, string>;
+  /** The consumer's `extends` entry. */
+  extend?: string;
+  /** Temp directory prefix (a space in it exercises URL decoding). */
+  prefix?: string;
+}
+
+/**
+ * A consumer config at `<dir>/config/.xlinter.yaml` extending a preset package installed in
+ * its own `node_modules`.
+ */
+async function createPresetFixture(fixture: PresetFixture): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), fixture.prefix ?? "xlinter-preset-"));
   presetDirs.push(dir);
   const configDir = path.join(dir, "config");
   const packageDir = path.join(configDir, "node_modules", "@acme", "preset");
   await mkdir(packageDir, { recursive: true });
   await writeFile(
     path.join(packageDir, "package.json"),
-    JSON.stringify({ name: "@acme/preset", version: "1.0.0", exports: exportsField }),
+    JSON.stringify({ name: "@acme/preset", version: "1.0.0", exports: fixture.exports }),
   );
-  await writeFile(path.join(packageDir, "xlinter.yaml"), "version: 1\nnamespace: preset\n");
+  const files: Record<string, string> = { "xlinter.yaml": PRESET_EMPTY, ...fixture.files };
+  for (const [name, content] of Object.entries(files)) {
+    await writeFile(path.join(packageDir, name), content);
+  }
   await writeFile(
     path.join(configDir, ".xlinter.yaml"),
-    'version: 1\nnamespace: consumer\nextends: ["@acme/preset"]\n',
+    `version: 1\nnamespace: consumer\nextends: ["${fixture.extend ?? "@acme/preset"}"]\n`,
   );
   return dir;
 }
@@ -44,11 +74,11 @@ interface CliResult {
 }
 
 /** Spawn the built CLI; a non-zero exit is a result, never a test crash. */
-function runCli(args: string[], cwd: string): Promise<CliResult> {
+function runCli(args: string[], cwd: string, nodeArgs: string[] = []): Promise<CliResult> {
   return new Promise((resolve, reject) => {
     execFile(
       process.execPath,
-      [cliPath, ...args],
+      [...nodeArgs, cliPath, ...args],
       { cwd, timeout: 20_000 },
       (error, stdout, stderr) => {
         if (error && typeof error.code !== "number") {
@@ -105,7 +135,7 @@ describe("built CLI (dist/cli/main.js)", () => {
   });
 
   it("resolves a bare preset from the extending config's node_modules", async () => {
-    const dir = await createPresetFixture({ "./xlinter.yaml": "./xlinter.yaml" });
+    const dir = await createPresetFixture({ exports: { "./xlinter.yaml": "./xlinter.yaml" } });
     const { code, stdout, stderr } = await runCli(["--config", "config/.xlinter.yaml"], dir);
     expect(code).toBe(0);
     expect(stderr).toBe("");
@@ -113,10 +143,10 @@ describe("built CLI (dist/cli/main.js)", () => {
   });
 
   it("resolves an import-only preset from a path containing spaces", async () => {
-    const dir = await createPresetFixture(
-      { "./xlinter.yaml": { import: "./xlinter.yaml" } },
-      "xlinter preset ",
-    );
+    const dir = await createPresetFixture({
+      exports: { "./xlinter.yaml": { import: "./xlinter.yaml" } },
+      prefix: "xlinter preset ",
+    });
     const { code, stdout, stderr } = await runCli(["validate-config", "config/.xlinter.yaml"], dir);
     expect(code).toBe(0);
     expect(stderr).toBe("");
@@ -124,7 +154,7 @@ describe("built CLI (dist/cli/main.js)", () => {
   });
 
   it("reports a missing preset export as a config error", async () => {
-    const dir = await createPresetFixture({ "./other.yaml": "./xlinter.yaml" });
+    const dir = await createPresetFixture({ exports: { "./other.yaml": "./xlinter.yaml" } });
     const { code, stderr } = await runCli(["validate-config", "config/.xlinter.yaml"], dir);
     expect(code).toBe(2);
     expect(stderr).toContain(
@@ -132,6 +162,61 @@ describe("built CLI (dist/cli/main.js)", () => {
     );
     expect(stderr).toContain("Package subpath");
     expect(stderr).toContain(path.join(dir, "config", ".xlinter.yaml"));
+  });
+
+  it("reports an exported preset file that does not exist as a config error", async () => {
+    const dir = await createPresetFixture({ exports: { "./xlinter.yaml": "./missing.yaml" } });
+    const { code, stderr } = await runCli(["validate-config", "config/.xlinter.yaml"], dir);
+    expect(code).toBe(2);
+    expect(stderr).toContain('cannot resolve extends "@acme/preset"');
+    expect(stderr).toContain("Cannot find module");
+    expect(stderr).toContain(path.join(dir, "config", ".xlinter.yaml"));
+  });
+
+  it("selects the import branch of a conditional preset export", async () => {
+    const dir = await createPresetFixture({
+      exports: {
+        "./xlinter.yaml": {
+          require: "./require.yaml",
+          import: "./xlinter.yaml",
+          default: "./default.yaml",
+        },
+      },
+      files: { "require.yaml": PRESET_POISON, "default.yaml": PRESET_POISON },
+    });
+    const { code, stdout, stderr } = await runCli(["validate-config", "config/.xlinter.yaml"], dir);
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toContain("(0 rule instance(s))");
+  });
+
+  it("does not consult Node --conditions for a preset export", async () => {
+    const dir = await createPresetFixture({
+      exports: {
+        "./xlinter.yaml": { "xlinter-test": "./conditional.yaml", default: "./xlinter.yaml" },
+      },
+      files: { "conditional.yaml": PRESET_POISON },
+    });
+    const { code, stdout, stderr } = await runCli(
+      ["validate-config", "config/.xlinter.yaml"],
+      dir,
+      ["--conditions=xlinter-test"],
+    );
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toContain("(0 rule instance(s))");
+  });
+
+  it("selects a preset variant through a subpath export", async () => {
+    const dir = await createPresetFixture({
+      exports: { "./xlinter.yaml": "./xlinter.yaml", "./strict/xlinter.yaml": "./strict.yaml" },
+      files: { "strict.yaml": PRESET_ONE_RULE },
+      extend: "@acme/preset/strict",
+    });
+    const { code, stdout, stderr } = await runCli(["validate-config", "config/.xlinter.yaml"], dir);
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toContain("(1 rule instance(s))");
   });
 
   it("rules --format json exits 0 and lists the 9 builtin rule types", async () => {
