@@ -54,7 +54,12 @@ adapters:
     config: .markdownlint.yaml
 ```
 
-Shared policy is distributed as a preset package consumed via `extends`. The full config schema is
+Shared policy is distributed as a preset package consumed via `extends`. A `./` or `../` entry is
+relative to the config file that declares it. A bare name (`extends: ["@acme/preset"]`) resolves the
+package's exported `./xlinter.yaml` from the declaring file's location with Node's `import`, `node`,
+and `default` export conditions, so it also works from a global or `npx` install. Node's `--conditions`
+flag is not consulted: publish variants as subpath exports and select them explicitly
+(`extends: ["@acme/preset/strict"]` resolves `./strict/xlinter.yaml`). The full config schema is
 published as `xlinter/schema.json`.
 
 ## Rule types (M1)
