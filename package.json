@@ -54,6 +54,7 @@
   },
   "dependencies": {
     "ignore": "^7.0.6",
+    "import-meta-resolve": "4.2.0",
     "markdownlint": "0.41.1",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

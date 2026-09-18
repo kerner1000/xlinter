@@ -1,7 +1,8 @@
 import { readFile, realpath } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolve as resolveModule } from "import-meta-resolve";
 import { parse as parseYaml } from "yaml";
 import { validateRawConfig } from "./schema.js";
 import { mergeConfigs } from "./merge.js";
@@ -108,11 +109,8 @@ async function resolveExtend(spec: string, fromFile: string): Promise<string> {
     return path.resolve(path.dirname(fromFile), spec);
   }
   try {
-    const url = import.meta.resolve(
-      `${spec}/xlinter.yaml`,
-      pathToFileURL(fromFile).href,
-    );
-    return path.resolve(new URL(url).pathname);
+    const url = resolveModule(`${spec}/xlinter.yaml`, pathToFileURL(fromFile).href);
+    return fileURLToPath(url);
   } catch (e) {
     throw XlinterConfigError.single(
       `cannot resolve extends "${spec}" — a preset package must export "./xlinter.yaml" (${(e as Error).message})`,
