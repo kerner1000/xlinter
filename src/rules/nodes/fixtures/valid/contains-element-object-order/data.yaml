@@ -1,0 +1,4 @@
+items:
+  - ports: [80, 443]
+    metadata: {zone: a, tier: edge}
+    name: web

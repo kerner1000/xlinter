@@ -36,6 +36,7 @@ Prefer the literal forms. Reach for the pattern forms only where a literal canno
 invariant because the rest of the line is legitimately open-ended — a Make target's prerequisite
 list, for instance, where pinning the whole line would break the next time a prerequisite is
 added. Patterns are matched per line, so `^` and `$` anchor to a line rather than to the file.
+LF and CRLF line endings behave identically; line terminators are excluded from matching.
 
 ## Examples
 

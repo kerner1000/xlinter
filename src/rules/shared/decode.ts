@@ -87,6 +87,8 @@ export function applyDecode(
       } else {
         report({
           kind: "parse-error",
+          severity: "error",
+          remediation: "Fix the embedded YAML syntax; the rule cannot evaluate malformed content.",
           message: `cannot parse embedded ${decode.as} at ${locator.docPath ?? decode.path}: ${result.message}`,
           locator,
           expected: `well-formed ${decode.as}`,

@@ -123,3 +123,37 @@ describe("decode — failure modes are values, never throws", () => {
     expect(result.reason).toBe("parse-error");
   });
 });
+
+
+describe("decode — explicit literal indentation preserves columns", () => {
+  for (const format of ["yaml", "yaml-multi"] as const) {
+    it.each(["|2", "|2-", "|2+", "|-2", "|+2", "|2- # values"])(`${format}: %s`, (style) => {
+      // The indicator strips four spaces; the remaining four belong to the
+      // inner document and must not be added to its columns a second time.
+      const content = carrier("\n    service:\n      type: ClusterIP", style);
+      const node = parseStructured("chart.yaml", content, format).select("$.spec.valuesContent")[0]!;
+      const result = node.decode("yaml");
+      if (!result.ok) throw new Error("expected a successful decode");
+      expect(result.degraded).toBe(false);
+      const found = result.doc.select("$.service.type")[0]!;
+      const { line, column } = found.locator;
+      expect(line).toBe(6);
+      expect(column).toBe(17);
+      expect(content.split("\n")[line! - 1]!.slice(column! - 1)).toBe("ClusterIP");
+      expect(found.locator.embeddedIn).toBe("$.spec.valuesContent");
+    });
+  }
+
+  it.each([
+    { path: "$", content: "|2-\n    port: 80\n", column: 11 },
+    { path: "$[0]", content: "- |2-\n      port: 80\n", column: 13 },
+  ])("maps a literal at $path", ({ path, content, column }) => {
+    const node = parseStructured("chart.yaml", content, "yaml").select(path)[0]!;
+    const result = node.decode("yaml");
+    if (!result.ok) throw new Error("expected a successful decode");
+    expect(result.degraded).toBe(false);
+    const found = result.doc.select("$.port")[0]!;
+    expect(found.locator).toMatchObject({ line: 2, column });
+    expect(content.split("\n")[1]!.slice(column - 1)).toBe("80");
+  });
+});

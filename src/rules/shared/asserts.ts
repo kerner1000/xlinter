@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import type { DocNode } from "../../structured/doc.js";
 import type { Locator, ReportInput } from "../../rule/types.js";
@@ -74,10 +75,8 @@ export function render(value: unknown): string {
 }
 
 export function deepEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (typeof a !== typeof b || a === null || b === null) return false;
-  if (typeof a !== "object") return false;
-  return JSON.stringify(a) === JSON.stringify(b);
+  // Mapping key order is immaterial; array order and scalar types are not.
+  return isDeepStrictEqual(a, b);
 }
 
 /**
