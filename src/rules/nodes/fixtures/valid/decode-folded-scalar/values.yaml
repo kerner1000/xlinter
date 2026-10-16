@@ -1,0 +1,4 @@
+kind: HelmChartConfig
+spec:
+  valuesContent: >-
+    service: {type: ClusterIP}

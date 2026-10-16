@@ -1,0 +1,23 @@
+# The whole traefik-shaped contract in one instance: nine invariants that live
+# inside a YAML string. Doubles as the no-over-reporting guard.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  requireMatch: true
+  assert:
+    - { path: '$.updateStrategy.type', eq: Recreate, required: true }
+    - { path: '$.service.type', eq: ClusterIP, required: true }
+    - { path: '$.service.externalIPs', absent: true }
+    - { path: '$.ports.web.hostPort', eq: 80, required: true }
+    - { path: '$.ports.websecure.hostPort', eq: 443, required: true }
+    - { path: '$.hostNetwork', absent: true }
+    - { path: '$.service.externalTrafficPolicy', absent: true }
+    - { path: '$.providers.kubernetesIngress.publishedService.enabled', eq: false, required: true }
+    - path: '$.additionalArguments'
+      required: true
+      containsElement: "--providers.kubernetesingress.ingressendpoint.ip=185.98.123.77"
+include: ["*.yaml"]
+expected:
+  outcome: pass
+  findings: []

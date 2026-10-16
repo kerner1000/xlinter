@@ -1,0 +1,12 @@
+# A folded scalar re-wraps its source, so inner line N is not outer line N + k.
+# The decode still works; only the positions degrade to the containing scalar.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - { path: '$.service.type', eq: ClusterIP, required: true }
+include: ["*.yaml"]
+expected:
+  outcome: pass
+  findings: []

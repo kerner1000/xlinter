@@ -1,0 +1,16 @@
+# Malformed embedded content is an error on the containing file, not a crash:
+# a DocParseError escaping the rule would abort the invocation and leave every
+# remaining target unlinted.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - { path: '$.service.type', eq: ClusterIP, required: true }
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: traefik.yaml
+      kind: parse-error
+      messageIncludes: 'cannot parse embedded yaml at $.spec.valuesContent'

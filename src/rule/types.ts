@@ -40,6 +40,12 @@ export interface Locator {
   docIndex?: number;
   /** Node identity (uid/name) — survives reordering; powers node-keyed exemptions later. */
   nodeId?: string;
+  /**
+   * Outer docPath of the string this document was decoded out of, when the
+   * finding is inside an embedded document (`decode`). `docPath` stays
+   * relative to the embedded document so it round-trips against it.
+   */
+  embeddedIn?: string;
 }
 
 export interface Finding {

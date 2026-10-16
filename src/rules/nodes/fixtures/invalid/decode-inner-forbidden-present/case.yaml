@@ -1,0 +1,15 @@
+# `absent: true` inside the embedded document, reported at its outer line.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - { path: '$.hostNetwork', absent: true }
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: traefik.yaml
+      kind: forbidden
+      line: 4
+      messageIncludes: forbidden value $.hostNetwork is present

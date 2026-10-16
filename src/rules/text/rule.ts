@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { defineRule } from "../../rule/define.js";
+import { regexString } from "../../selector/schema.js";
 
 const options = z
   .strictObject({
@@ -7,12 +8,27 @@ const options = z
     require: z.array(z.string().min(1)).default([]),
     /** Literals that must not appear anywhere in the file. */
     forbid: z.array(z.string().min(1)).default([]),
+    /**
+     * Patterns that must match somewhere in the file. Use these only where a
+     * literal cannot express the invariant — a line whose other content is
+     * legitimately open-ended, such as a Make target's prerequisite list.
+     * Matched per line (`^`/`$` anchor to a line, not the file).
+     */
+    requireMatch: z.array(regexString).default([]),
+    /** Patterns that must not match any line. */
+    forbidMatch: z.array(regexString).default([]),
   })
   .superRefine((o, ctx) => {
-    if (o.require.length === 0 && o.forbid.length === 0) {
+    if (
+      o.require.length === 0 &&
+      o.forbid.length === 0 &&
+      o.requireMatch.length === 0 &&
+      o.forbidMatch.length === 0
+    ) {
       ctx.addIssue({
         code: "custom",
-        message: "at least one of require/forbid must be non-empty",
+        message:
+          "at least one of require/forbid/requireMatch/forbidMatch must be non-empty",
       });
     }
   });
@@ -56,6 +72,34 @@ export const textRule = defineRule<Options>({
             expected: `no occurrence of ${JSON.stringify(literal)}`,
             found: literal,
           });
+        }
+      }
+      if (ctx.options.requireMatch.length > 0 || ctx.options.forbidMatch.length > 0) {
+        const lines = text.split("\n");
+        for (const pattern of ctx.options.requireMatch) {
+          const re = new RegExp(pattern);
+          if (!lines.some((l) => re.test(l))) {
+            ctx.report({
+              kind: "absence",
+              message: `no line matches required pattern /${pattern}/`,
+              locator: { file },
+              expected: `a line matching /${pattern}/`,
+              found: "no match",
+            });
+          }
+        }
+        for (const pattern of ctx.options.forbidMatch) {
+          const re = new RegExp(pattern);
+          const idx = lines.findIndex((l) => re.test(l));
+          if (idx !== -1) {
+            ctx.report({
+              kind: "forbidden",
+              message: `line matches forbidden pattern /${pattern}/`,
+              locator: { file, line: idx + 1 },
+              expected: `no line matching /${pattern}/`,
+              found: lines[idx] ?? "",
+            });
+          }
         }
       }
     }

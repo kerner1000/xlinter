@@ -62,7 +62,7 @@ flag is not consulted: publish variants as subpath exports and select them expli
 (`extends: ["@acme/preset/strict"]` resolves `./strict/xlinter.yaml`). The full config schema is
 published as `xlinter/schema.json`.
 
-## Rule types (M1)
+## Rule types
 
 | type | invariant |
 | --- | --- |
@@ -71,6 +71,14 @@ published as `xlinter/schema.json`.
 | `first-heading` | first H1 matches a pattern (`${stem}` substitution) |
 | `index-completeness` | an index file and its directory stay bidirectionally complete |
 | `nodes` | structured-file assertions over YAML / JSON / frontmatter via JSONPath selection |
+| `node-table` | a keyed expectation table: every value bound to the node that owns the key |
+| `cross-file` | a value in one file must relate to a value in another |
+| `forbidden-tokens` | tokens that must not appear, with boundary semantics |
+| `text` | literal and per-line pattern containment over plain text |
+
+`nodes` and `node-table` can `decode` a document carried as a *string* inside a file — a Helm
+`valuesContent` block, an embedded policy — and check the parsed inner document, with inner
+findings reported at their real line in the outer file.
 
 Plus the `markdownlint` adapter (exact-pinned upstream, config passthrough, findings normalized
 into xlinter's output with severity overrides per upstream rule).
@@ -88,10 +96,9 @@ into xlinter's output with severity overrides per upstream rule).
 
 ## Status
 
-Early (M1 bootstrap). The engine, five rule types, the markdownlint adapter, and the fixture
-harness are real and dogfooded on this repository (see [.xlinter.yaml](.xlinter.yaml)). Planned:
-agent-workspace rule library, per-node expectation tables for structured policy, MCP server mode,
-GitHub Action packaging, SARIF.
+Early. The engine, nine rule types, embedded-document decoding, the markdownlint adapter, and the
+fixture harness are real and dogfooded on this repository (see [.xlinter.yaml](.xlinter.yaml)).
+Planned: agent-workspace rule library, MCP server mode, GitHub Action packaging, SARIF.
 
 ## License
 

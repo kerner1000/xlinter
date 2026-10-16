@@ -21,16 +21,17 @@ each citing its own key).
 
 ## Options
 
-| Option        | Type      | Default | Description                                                        |
-| ------------- | --------- | ------- | ------------------------------------------------------------------ |
-| `parse`       | `enum`    | —       | Required. `yaml`, `yaml-multi`, `json`, or `frontmatter`.          |
-| `select`      | `string`  | —       | Required. Selector for the row nodes.                              |
-| `key`         | `string`  | —       | Required. Node-relative selector; must resolve to one scalar.      |
-| `closedWorld` | `boolean` | `false` | Every present key must appear in `rows` (requires non-empty rows). |
-| `onNoRows`    | `enum`    | `error` | `error` or `pass` when `select` matches nothing.                   |
-| `columns`     | `object`  | `{}`    | Named sibling sub-selections: `{path, required (default true)}`.   |
-| `common`      | `array`   | `[]`    | Assertions (the shared vocabulary) applied to every row node.      |
-| `rows`        | `object`  | `{}`    | Per-key expectations: key → field/column name → value checks.      |
+| Option        | Type      | Default | Description                                                                                                                                                |
+| ------------- | --------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parse`       | `enum`    | —       | Required. `yaml`, `yaml-multi`, `json`, or `frontmatter`.                                                                                                  |
+| `decode`      | `object`  | —       | Take rows from a document carried as a string in the file; same `{path, as, required}` shape and semantics as [nodes](nodes.md#embedded-documents-decode). |
+| `select`      | `string`  | —       | Required. Selector for the row nodes.                                                                                                                      |
+| `key`         | `string`  | —       | Required. Node-relative selector; must resolve to one scalar.                                                                                              |
+| `closedWorld` | `boolean` | `false` | Every present key must appear in `rows` (requires non-empty rows).                                                                                         |
+| `onNoRows`    | `enum`    | `error` | `error` or `pass` when `select` matches nothing.                                                                                                           |
+| `columns`     | `object`  | `{}`    | Named sibling sub-selections: `{path, required (default true)}`.                                                                                           |
+| `common`      | `array`   | `[]`    | Assertions (the shared vocabulary) applied to every row node.                                                                                              |
+| `rows`        | `object`  | `{}`    | Per-key expectations: key → field/column name → value checks.                                                                                              |
 
 Field names in `rows` cells resolve in this order: a name defined in `columns` → the bound
 column node; a name starting with `$` → a node-relative selector; a bare identifier `name` →

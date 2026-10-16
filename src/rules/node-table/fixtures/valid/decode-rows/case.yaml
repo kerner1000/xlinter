@@ -1,0 +1,20 @@
+# The composability test: rows are selected INSIDE the embedded document, and
+# key/columns/rows behave exactly as they do on a plain file. This is why the
+# lens is applied before `select` rather than after it.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$.services[*]'
+  key: '$.name'
+  closedWorld: true
+  common:
+    - { path: '$.hostPort', required: true }
+  rows:
+    web:
+      '$.hostPort': { eq: 80 }
+    websecure:
+      '$.hostPort': { eq: 443 }
+include: ["*.yaml"]
+expected:
+  outcome: pass
+  findings: []

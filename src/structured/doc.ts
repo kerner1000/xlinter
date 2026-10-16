@@ -21,9 +21,46 @@ export interface DocNode {
   readonly path: readonly (string | number)[];
   get(key: string | number): DocNode | undefined;
   select(path: string): DocNode[];
-  /** Nested parse: this node's string value parsed as its own YAML document. */
-  parseAsYaml(): StructuredDoc;
+  /**
+   * Embedded-document lens: this node's string value parsed as its own
+   * document. Never throws — every failure mode is a value the caller reports,
+   * because a throw here would abort the whole rule invocation and leave the
+   * remaining targets unlinted.
+   */
+  decode(format: EmbeddedFormat): DecodeResult;
 }
+
+/** Formats an embedded string may be decoded as. Deliberately one member. */
+export type EmbeddedFormat = "yaml";
+
+/**
+ * Where a block scalar's content begins in the *outer* file, so inner
+ * positions can be mapped back onto it. Only literal blocks (`|`, `|-`)
+ * preserve their source line-for-line; see `decode()`.
+ */
+export interface EmbeddedSource {
+  /** 1-based line of the block scalar's first content line. */
+  contentStartLine: number;
+  /** Columns of indentation stripped from every content line. */
+  indent: number;
+}
+
+export type SourceOf = (
+  path: readonly (string | number)[],
+) => EmbeddedSource | undefined;
+
+export type DecodeResult =
+  | {
+      ok: true;
+      doc: StructuredDoc;
+      /**
+       * True when inner positions could not be mapped and every inner finding
+       * carries the containing scalar's own position instead.
+       */
+      degraded: boolean;
+    }
+  | { ok: false; reason: "not-a-string"; found: string }
+  | { ok: false; reason: "parse-error"; message: string };
 
 export interface StructuredDoc {
   /** Root nodes — one per document (multi-doc YAML yields several). */
@@ -38,12 +75,37 @@ export type PositionOf = (path: readonly (string | number)[]) => {
   column?: number;
 } | undefined;
 
+/** Per-document context shared by every node built from it. */
+interface DocContext {
+  file: string;
+  positionOf: PositionOf;
+  sourceOf?: SourceOf | undefined;
+  docIndex?: number | undefined;
+  /**
+   * Outer docPath of the scalar this document was decoded out of. Present
+   * only on decoded documents; stamped onto every finding they produce.
+   */
+  embeddedIn?: string | undefined;
+}
+
 export function makeDoc(
   file: string,
-  docs: readonly { value: unknown; positionOf: PositionOf; docIndex?: number }[],
+  docs: readonly {
+    value: unknown;
+    positionOf: PositionOf;
+    sourceOf?: SourceOf;
+    docIndex?: number;
+  }[],
+  embeddedIn?: string,
 ): StructuredDoc {
   const roots = docs.map((d) =>
-    makeNode(file, d.value, [], d.positionOf, d.docIndex),
+    makeNode(d.value, [], {
+      file,
+      positionOf: d.positionOf,
+      sourceOf: d.sourceOf,
+      docIndex: d.docIndex,
+      embeddedIn,
+    }),
   );
   return {
     roots,
@@ -54,17 +116,16 @@ export function makeDoc(
 }
 
 function makeNode(
-  file: string,
   value: unknown,
   path: readonly (string | number)[],
-  positionOf: PositionOf,
-  docIndex: number | undefined,
+  ctx: DocContext,
 ): DocNode {
-  const pos = positionOf(path);
-  const locator: Locator = { file, docPath: renderDocPath(path) };
+  const pos = ctx.positionOf(path);
+  const locator: Locator = { file: ctx.file, docPath: renderDocPath(path) };
   if (pos?.line !== undefined) locator.line = pos.line;
   if (pos?.column !== undefined) locator.column = pos.column;
-  if (docIndex !== undefined) locator.docIndex = docIndex;
+  if (ctx.docIndex !== undefined) locator.docIndex = ctx.docIndex;
+  if (ctx.embeddedIn !== undefined) locator.embeddedIn = ctx.embeddedIn;
   const node: DocNode = {
     value,
     locator,
@@ -72,22 +133,50 @@ function makeNode(
     get(key: string | number): DocNode | undefined {
       const child = childValue(value, key);
       if (child === undefined) return undefined;
-      return makeNode(file, child, [...path, key], positionOf, docIndex);
+      return makeNode(child, [...path, key], ctx);
     },
     select(selector: string): DocNode[] {
       const segments = parseSelector(selector);
       return evaluate(node, segments);
     },
-    parseAsYaml(): StructuredDoc {
+    decode(format: EmbeddedFormat): DecodeResult {
       if (typeof value !== "string") {
-        throw new TypeError(
-          `parseAsYaml() requires a string node, got ${typeof value} at ${locator.docPath}`,
-        );
+        return { ok: false, reason: "not-a-string", found: typeName(value) };
       }
-      return parseStructured(file, value, "yaml");
+      const source = ctx.sourceOf?.(path);
+      try {
+        const inner = parseStructured(ctx.file, value, format, {
+          ...(source ? { offset: source } : {}),
+          embeddedIn: locator.docPath ?? "$",
+          // A degraded decode must still land somewhere real: pin every inner
+          // finding to the containing scalar rather than to line 1 of a file
+          // whose line 1 is something else entirely.
+          ...(source
+            ? {}
+            : {
+                pin: {
+                  ...(locator.line !== undefined ? { line: locator.line } : {}),
+                  ...(locator.column !== undefined ? { column: locator.column } : {}),
+                },
+              }),
+        });
+        return { ok: true, doc: inner, degraded: source === undefined };
+      } catch (e) {
+        return {
+          ok: false,
+          reason: "parse-error",
+          message: e instanceof Error ? e.message : String(e),
+        };
+      }
     },
   };
   return node;
+}
+
+function typeName(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
 }
 
 function childValue(value: unknown, key: string | number): unknown {
