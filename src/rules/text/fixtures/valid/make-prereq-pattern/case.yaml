@@ -1,0 +1,12 @@
+# A literal cannot express this: the prerequisite list is legitimately
+# open-ended, so asserting the whole line breaks the next time a prereq is
+# added. The pattern binds only the part that is policy.
+options:
+  requireMatch:
+    - '^apply-cluster-docflow-prod:.*apply-traefik-config-docflow-prod'
+  forbidMatch:
+    - '^apply-cluster-docflow-prod:.*[^-]staging'
+include: ["Makefile"]
+expected:
+  outcome: pass
+  findings: []

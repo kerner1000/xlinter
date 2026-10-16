@@ -24,6 +24,7 @@ robust against reformatting, reordering, and quoting changes.
 | Option         | Type      | Default | Description                                                          |
 | -------------- | --------- | ------- | -------------------------------------------------------------------- |
 | `parse`        | `enum`    | —       | Required. `yaml`, `yaml-multi`, `json`, or `frontmatter`.            |
+| `decode`       | `object`  | —       | Check a document carried as a string inside the file (see below).    |
 | `select`       | `string`  | —       | Required. Selector for the nodes each assertion runs against.        |
 | `requireMatch` | `boolean` | `false` | Report an `absence` finding when `select` matches no node in a file. |
 | `assert`       | `array`   | —       | Required (min 1). Assertions, each applied to every selected node.   |
@@ -32,18 +33,19 @@ robust against reformatting, reordering, and quoting changes.
 Each entry of `assert` names a node-relative `path` (required; `$` re-roots at the selected node)
 plus any of these checks:
 
-| Assertion       | Type      | Fires when                                           | Finding kind |
-| --------------- | --------- | ---------------------------------------------------- | ------------ |
-| `required`      | `boolean` | `true` and no value exists at `path`                 | `absence`    |
-| `absent`        | `boolean` | `true` and any value exists at `path`                | `forbidden`  |
-| `eq`            | any       | the value is not deep-equal to the given value       | `mismatch`   |
-| `regex`         | `string`  | the stringified value does not match the regex       | `mismatch`   |
-| `enum`          | `array`   | the value is deep-equal to none of the entries       | `mismatch`   |
-| `contains`      | `string`  | the stringified value lacks the substring            | `mismatch`   |
-| `notContains`   | `string`  | the stringified value contains the substring         | `forbidden`  |
-| `notMatch`      | `string`  | the stringified value matches the regex              | `forbidden`  |
-| `containsCount` | `object`  | `substring` occurs a number of times other than `eq` | `mismatch`   |
-| `scan`          | `object`  | extraction-based checks fail (see below)             | varies       |
+| Assertion         | Type      | Fires when                                             | Finding kind |
+| ----------------- | --------- | ------------------------------------------------------ | ------------ |
+| `required`        | `boolean` | `true` and no value exists at `path`                   | `absence`    |
+| `absent`          | `boolean` | `true` and any value exists at `path`                  | `forbidden`  |
+| `eq`              | any       | the value is not deep-equal to the given value         | `mismatch`   |
+| `regex`           | `string`  | the stringified value does not match the regex         | `mismatch`   |
+| `enum`            | `array`   | the value is deep-equal to none of the entries         | `mismatch`   |
+| `contains`        | `string`  | the stringified value lacks the substring              | `mismatch`   |
+| `notContains`     | `string`  | the stringified value contains the substring           | `forbidden`  |
+| `notMatch`        | `string`  | the stringified value matches the regex                | `forbidden`  |
+| `containsCount`   | `object`  | `substring` occurs a number of times other than `eq`   | `mismatch`   |
+| `containsElement` | any       | the value is not an array holding a deep-equal element | `absence`    |
+| `scan`            | `object`  | extraction-based checks fail (see below)               | varies       |
 
 Evaluation notes:
 
@@ -68,6 +70,49 @@ Evaluation notes:
 - A file the parser cannot read produces a `parse-error` finding — malformed target content is
   always an error.
 - When `requireMatch` is `false`, a file where `select` matches nothing passes silently.
+- `containsElement` respects element boundaries, which `contains` cannot: `contains` stringifies
+  the array, so it accepts `…ip=10.0.0.11` for an expected `…ip=10.0.0.1`.
+
+## Embedded documents (`decode`)
+
+Some configuration is carried as a *string* inside structured configuration — a Helm
+`valuesContent` block, an embedded policy, a serialized manifest. Text matching over that string
+cannot bind a value to the key that owns it, which is the whole failure mode this rule type
+exists to prevent. `decode` parses the string and re-roots the rule on the resulting document, so
+the entire assertion vocabulary applies to it unchanged.
+
+| Field      | Type      | Default | Description                                                                               |
+| ---------- | --------- | ------- | ----------------------------------------------------------------------------------------- |
+| `path`     | `string`  | —       | Required. Selector for the string node(s), against the outer file.                        |
+| `as`       | `enum`    | —       | Required. `yaml`. Never defaulted, so it still reads correctly if more formats are added. |
+| `required` | `boolean` | `true`  | When `false`, a file without the path is simply not covered.                              |
+
+```yaml
+rules:
+  traefik-host-ports:
+    type: nodes
+    targets: { include: ["clusters/prod/traefik-config.yaml"] }
+    parse: yaml
+    decode: { path: "$.spec.valuesContent", as: yaml }
+    select: "$"
+    assert:
+      - { path: "$.ports.web.hostPort", eq: 80, required: true }
+      - { path: "$.ports.websecure.hostPort", eq: 443, required: true }
+```
+
+Notes:
+
+- The lens is applied **before** `select`, so `select` addresses nodes inside the embedded
+  document. In [node-table](node-table.md) this is what lets rows be selected from it.
+- `decode.required` defaults to `true`: deleting the carrier is an `absence` finding, not a file
+  on which every assertion vacuously passes.
+- A carrier that is not a string is a `mismatch`; embedded content that does not parse is a
+  `parse-error` on the containing file. Neither aborts the run.
+- Findings inside an embedded document carry `embeddedIn` (the outer path of the carrier) while
+  `docPath` stays relative to the embedded document, so it round-trips against it.
+- Positions map exactly for literal block scalars (`|`, `|-`). Folded (`>`) and quoted scalars
+  re-wrap or unescape their source, so inner line N is not outer line N + k: those degrade to the
+  carrier's own position and emit an advisory note saying so.
 
 ## Examples
 

@@ -1,0 +1,12 @@
+# The bootstrap target no longer depends on the Traefik config, so a cluster
+# can come up without the host-port configuration.
+options:
+  requireMatch:
+    - '^apply-cluster-docflow-prod:.*apply-traefik-config-docflow-prod'
+include: ["Makefile"]
+expected:
+  outcome: error
+  findings:
+    - file: Makefile
+      kind: absence
+      messageIncludes: no line matches required pattern

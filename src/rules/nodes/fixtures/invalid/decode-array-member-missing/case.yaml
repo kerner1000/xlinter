@@ -1,0 +1,17 @@
+# The near-miss element has a trailing digit. `contains` on the array would
+# stringify it and pass; containsElement respects element boundaries.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - path: '$.additionalArguments'
+      required: true
+      containsElement: "--providers.kubernetesingress.ingressendpoint.ip=185.98.123.77"
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: traefik.yaml
+      kind: absence
+      messageIncludes: does not contain the required element

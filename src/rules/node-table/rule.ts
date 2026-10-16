@@ -10,11 +10,14 @@ import {
   type Reporter,
   type ValueChecks,
 } from "../shared/asserts.js";
+import { applyDecode, decodeOption } from "../shared/decode.js";
 import type { DocNode } from "../../structured/doc.js";
 
 const options = z
   .strictObject({
     parse: z.enum(["yaml", "yaml-multi", "json", "frontmatter"]),
+    /** Parse a string node's content as its own document and take rows from it. */
+    decode: decodeOption.optional(),
     /** Selector for the row nodes. */
     select: selectorString,
     /** Node-relative selector for a row's identity; must resolve to one scalar. */
@@ -60,8 +63,12 @@ export const nodeTableRule = defineRule<Options>({
     const o = ctx.options;
     for (const target of ctx.targets) {
       const report = (f: Parameters<typeof ctx.report>[0]): void => ctx.report(f);
-      const doc = await ctx.readDoc(target, o.parse);
       const file = target.relPath;
+      const outer = await ctx.readDoc(target, o.parse);
+      const doc = o.decode
+        ? applyDecode(outer, o.decode, file, report, (m, l) => ctx.note(m, l))
+        : outer;
+      if (!doc) continue;
       const rowNodes = doc.select(o.select);
 
       if (rowNodes.length === 0) {

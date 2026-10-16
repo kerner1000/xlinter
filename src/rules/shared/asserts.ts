@@ -53,6 +53,13 @@ export const valueChecks = z.strictObject({
   containsCount: z
     .strictObject({ substring: z.string().min(1), eq: z.number().int().min(0) })
     .optional(),
+  /**
+   * The value must be an array with an element deep-equal to this. Unlike
+   * `contains`, which stringifies the array and so accepts a prefix of an
+   * element, this respects element boundaries — the difference between
+   * accepting and rejecting `…ip=185.98.123.771` for `…ip=185.98.123.77`.
+   */
+  containsElement: z.unknown().optional(),
   scan: scanSchema.optional(),
 });
 export type ValueChecks = z.infer<typeof valueChecks>;
@@ -157,6 +164,18 @@ export function runValueChecks(
         expected: checks.enum.map(render).join(" | "),
         found: render(value),
       });
+    }
+    if (checks.containsElement !== undefined) {
+      const list = Array.isArray(value) ? value : undefined;
+      if (!list || !list.some((el) => deepEqual(el, checks.containsElement))) {
+        report({
+          kind: "absence",
+          message: `${prefix}${label} does not contain the required element`,
+          locator: at(v.locator),
+          expected: `an array containing ${render(checks.containsElement)}`,
+          found: list ? render(value) : `not an array (${render(value)})`,
+        });
+      }
     }
     if (checks.contains !== undefined && !String(value).includes(checks.contains)) {
       report({

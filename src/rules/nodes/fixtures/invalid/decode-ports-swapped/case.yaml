@@ -1,0 +1,24 @@
+# The case text scanning cannot catch: both literals are still present, each on
+# the wrong node. A `scan` with setEq ["80","443"] over the raw string passes
+# here. Exactly two findings, each at its own outer line.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - { path: '$.ports.web.hostPort', eq: 80, required: true }
+    - { path: '$.ports.websecure.hostPort', eq: 443, required: true }
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: traefik.yaml
+      kind: mismatch
+      line: 6
+      docPath: '$.ports.web.hostPort'
+      messageIncludes: has the wrong value
+    - file: traefik.yaml
+      kind: mismatch
+      line: 8
+      docPath: '$.ports.websecure.hostPort'
+      messageIncludes: has the wrong value

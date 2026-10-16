@@ -1,0 +1,15 @@
+# The day someone converts the block scalar to structured YAML, the rule must
+# say so rather than crash or silently skip.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - { path: '$.service.type', eq: ClusterIP, required: true }
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: traefik.yaml
+      kind: mismatch
+      messageIncludes: 'decode target $.spec.valuesContent is not a string'

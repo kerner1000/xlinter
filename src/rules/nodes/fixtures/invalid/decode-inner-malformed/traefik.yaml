@@ -1,0 +1,6 @@
+kind: HelmChartConfig
+spec:
+  valuesContent: |-
+    ports: [web
+    service:
+      type: ClusterIP

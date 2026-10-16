@@ -1,0 +1,26 @@
+# Swapped values inside the embedded document: two findings, each carrying the
+# nodeId of the row that owns the wrong value.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$.services[*]'
+  key: '$.name'
+  rows:
+    web:
+      '$.hostPort': { eq: 80 }
+    websecure:
+      '$.hostPort': { eq: 443 }
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: chart.yaml
+      kind: mismatch
+      line: 6
+      nodeId: web
+      messageIncludes: has the wrong value
+    - file: chart.yaml
+      kind: mismatch
+      line: 8
+      nodeId: websecure
+      messageIncludes: has the wrong value

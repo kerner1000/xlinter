@@ -1,0 +1,6 @@
+kind: HelmChartConfig
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--providers.kubernetesingress.ingressendpoint.ip=185.98.123.771"
+      - "--entrypoints.web.proxyprotocol.insecure"

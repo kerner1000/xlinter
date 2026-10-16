@@ -1,0 +1,16 @@
+# Deleting the carrier must fail loudly. Without decode.required defaulting to
+# true, every assertion below would vacuously pass on a file that configures
+# nothing at all.
+options:
+  parse: yaml
+  decode: { path: "$.spec.valuesContent", as: yaml }
+  select: '$'
+  assert:
+    - { path: '$.service.type', eq: ClusterIP, required: true }
+include: ["*.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: traefik.yaml
+      kind: absence
+      messageIncludes: 'decode path $.spec.valuesContent matched no node'

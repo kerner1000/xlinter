@@ -6,6 +6,9 @@ export function formatHuman(result: RunResult): string {
     const loc = f.locator.line !== undefined ? `${f.locator.file}:${f.locator.line}` : f.locator.file;
     const docPath = f.locator.docPath ? ` at ${f.locator.docPath}` : "";
     out.push(`${loc}: [${f.severity}] ${f.ruleId} — ${f.message}${docPath}`);
+    if (f.locator.embeddedIn) {
+      out.push(`    in embedded content at ${f.locator.embeddedIn}`);
+    }
     if (f.expected !== undefined || f.found !== undefined) {
       out.push(`    expected: ${f.expected ?? "-"}  found: ${f.found ?? "-"}`);
     }

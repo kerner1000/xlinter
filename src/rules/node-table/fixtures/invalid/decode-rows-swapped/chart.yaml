@@ -1,0 +1,8 @@
+kind: HelmChartConfig
+spec:
+  valuesContent: |-
+    services:
+      - name: web
+        hostPort: 443
+      - name: websecure
+        hostPort: 80

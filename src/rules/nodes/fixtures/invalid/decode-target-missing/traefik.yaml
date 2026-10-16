@@ -1,0 +1,3 @@
+kind: HelmChartConfig
+spec:
+  chart: traefik

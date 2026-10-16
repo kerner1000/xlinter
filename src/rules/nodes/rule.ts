@@ -3,9 +3,12 @@ import { defineRule } from "../../rule/define.js";
 import { comparePaths } from "../../structured/doc.js";
 import { selectorString } from "../../selector/schema.js";
 import { assertion, runAssertion } from "../shared/asserts.js";
+import { applyDecode, decodeOption } from "../shared/decode.js";
 
 const options = z.strictObject({
   parse: z.enum(["yaml", "yaml-multi", "json", "frontmatter"]),
+  /** Parse a string node's content as its own document and check that instead. */
+  decode: decodeOption.optional(),
   /** Selector for the nodes each assertion runs against. */
   select: selectorString,
   /** Fail (kind: absence) when `select` matches no node in a file. */
@@ -33,7 +36,17 @@ export const nodesRule = defineRule<Options>({
   },
   async check(ctx) {
     for (const target of ctx.targets) {
-      const doc = await ctx.readDoc(target, ctx.options.parse);
+      const outer = await ctx.readDoc(target, ctx.options.parse);
+      const doc = ctx.options.decode
+        ? applyDecode(
+            outer,
+            ctx.options.decode,
+            target.relPath,
+            (f) => ctx.report(f),
+            (m, l) => ctx.note(m, l),
+          )
+        : outer;
+      if (!doc) continue;
       const selected = doc.select(ctx.options.select);
       if (selected.length === 0 && ctx.options.requireMatch) {
         ctx.report({

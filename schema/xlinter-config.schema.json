@@ -487,6 +487,30 @@
             "frontmatter"
           ]
         },
+        "decode": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "as": {
+              "type": "string",
+              "enum": [
+                "yaml"
+              ]
+            },
+            "required": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path",
+            "as"
+          ],
+          "additionalProperties": false
+        },
         "select": {
           "type": "string",
           "minLength": 1
@@ -545,6 +569,7 @@
                 ],
                 "additionalProperties": false
               },
+              "containsElement": {},
               "scan": {
                 "type": "object",
                 "properties": {
@@ -687,6 +712,30 @@
             "frontmatter"
           ]
         },
+        "decode": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "as": {
+              "type": "string",
+              "enum": [
+                "yaml"
+              ]
+            },
+            "required": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "path",
+            "as"
+          ],
+          "additionalProperties": false
+        },
         "select": {
           "type": "string",
           "minLength": 1
@@ -781,6 +830,7 @@
                 ],
                 "additionalProperties": false
               },
+              "containsElement": {},
               "scan": {
                 "type": "object",
                 "properties": {
@@ -938,6 +988,7 @@
                   ],
                   "additionalProperties": false
                 },
+                "containsElement": {},
                 "scan": {
                   "type": "object",
                   "properties": {
@@ -1052,6 +1103,22 @@
           }
         },
         "forbid": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requireMatch": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "forbidMatch": {
           "default": [],
           "type": "array",
           "items": {
