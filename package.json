@@ -41,7 +41,6 @@
     "dist",
     "docs",
     "schema",
-    "src/rules/*/fixtures",
     "LICENSE",
     "README.md"
   ],
