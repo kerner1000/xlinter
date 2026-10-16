@@ -5,15 +5,16 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
+import type { RunResult } from "../../src/index.js";
 
 const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 const cliPath = path.join(projectRoot, "dist", "cli", "main.js");
 const reposDir = fileURLToPath(new URL("./repos/", import.meta.url));
 const repo = (name: string): string => path.join(reposDir, name);
-const presetDirs: string[] = [];
+const fixtureDirs: string[] = [];
 
 afterAll(async () => {
-  for (const dir of presetDirs) await rm(dir, { recursive: true, force: true });
+  for (const dir of fixtureDirs) await rm(dir, { recursive: true, force: true });
 });
 
 const PRESET_EMPTY = "version: 1\nnamespace: preset\n";
@@ -48,7 +49,7 @@ interface PresetFixture {
  */
 async function createPresetFixture(fixture: PresetFixture): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), fixture.prefix ?? "xlinter-preset-"));
-  presetDirs.push(dir);
+  fixtureDirs.push(dir);
   const configDir = path.join(dir, "config");
   const packageDir = path.join(configDir, "node_modules", "@acme", "preset");
   await mkdir(packageDir, { recursive: true });
@@ -251,4 +252,83 @@ describe("built CLI (dist/cli/main.js)", () => {
       expect(stdout.trim().length).toBeGreaterThan(0);
     },
   );
+});
+
+
+/** Exercise policy findings through the real CLI and its exit-code contract. */
+async function lintRuleFixture(rule: Record<string, unknown>, files: Record<string, string>) {
+  const dir = await mkdtemp(path.join(tmpdir(), "xlinter-rule-"));
+  fixtureDirs.push(dir);
+  await writeFile(path.join(dir, ".xlinter.yaml"), JSON.stringify({
+    version: 1,
+    discovery: "walk",
+    rules: { probe: { targets: { include: Object.keys(files) }, ...rule } },
+  }));
+  for (const [name, text] of Object.entries(files)) {
+    await writeFile(path.join(dir, name), text);
+  }
+  const result = await runCli(["--format", "json"], dir);
+  return { ...result, envelope: JSON.parse(result.stdout) as RunResult };
+}
+
+describe("review regressions through the built CLI", () => {
+  for (const type of ["nodes", "node-table"]) {
+    for (const severity of ["warn", "note"]) {
+      it(`${type}: malformed embedded YAML is an error at severity ${severity} and later targets still run`, async () => {
+        const checks = type === "nodes"
+          ? { select: "$", assert: [{ path: "$.port", eq: 80, required: true }] }
+          : { select: "$.services[*]", key: "$.name", rows: { web: { port: { eq: 80 } } } };
+        const later = type === "nodes"
+          ? "values: |\n  port: 81\n"
+          : "values: |\n  services:\n    - name: web\n      port: 81\n";
+        const { code, stderr, envelope } = await lintRuleFixture({
+          type, severity, parse: "yaml", decode: { path: "$.values", as: "yaml" }, ...checks,
+        }, { "a-broken.yaml": "values: |\n  port: [bad\n", "b-later.yaml": later });
+        expect(stderr).toBe("");
+        expect(code).toBe(1);
+        expect(envelope.failed).toBe(true);
+        expect(envelope.findings).toHaveLength(2);
+        expect(envelope.findings).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            kind: "parse-error", severity: "error", ruleType: type,
+            message: expect.stringContaining("cannot parse embedded yaml at $.values"),
+            remediation: expect.stringContaining("syntax"),
+            locator: expect.objectContaining({ file: "a-broken.yaml" }),
+          }),
+          expect.objectContaining({
+            kind: "mismatch", severity, ruleType: type,
+            message: expect.stringContaining("has the wrong value"),
+            locator: expect.objectContaining({ file: "b-later.yaml", embeddedIn: "$.values" }),
+          }),
+        ]));
+      });
+    }
+  }
+
+  for (const [label, eol] of [["LF", "\n"], ["CRLF", "\r\n"]] as const) {
+    it(`${label}: requireMatch accepts a full matching line and rejects a near miss`, async () => {
+      const rule = { type: "text", requireMatch: ["^enabled=true$"] };
+      const present = await lintRuleFixture(rule, { "settings.txt": ["intro", "enabled=true", "tail", ""].join(eol) });
+      expect(present.code).toBe(0);
+      expect(present.envelope.findings).toEqual([]);
+      const missing = await lintRuleFixture(rule, { "settings.txt": `enabled=true-extra${eol}` });
+      expect(missing.code).toBe(1);
+      expect(missing.envelope.findings).toMatchObject([{
+        kind: "absence", message: "no line matches required pattern /^enabled=true$/",
+      }]);
+    });
+
+    it(`${label}: forbidMatch rejects a full matching line and accepts a near miss`, async () => {
+      const rule = { type: "text", forbidMatch: ["^enabled=true$"] };
+      const forbidden = await lintRuleFixture(rule, { "settings.txt": ["intro", "enabled=true", "tail", ""].join(eol) });
+      expect(forbidden.code).toBe(1);
+      expect(forbidden.envelope.findings).toMatchObject([{
+        kind: "forbidden", locator: { file: "settings.txt", line: 2 },
+        message: "line matches forbidden pattern /^enabled=true$/", found: "enabled=true",
+      }]);
+      const allowed = await lintRuleFixture(rule, { "settings.txt": `enabled=true-extra${eol}` });
+      expect(allowed.code).toBe(0);
+      expect(allowed.envelope.findings).toEqual([]);
+    });
+  }
 });

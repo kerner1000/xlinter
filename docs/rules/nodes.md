@@ -72,6 +72,8 @@ Evaluation notes:
 - When `requireMatch` is `false`, a file where `select` matches nothing passes silently.
 - `containsElement` respects element boundaries, which `contains` cannot: `contains` stringifies
   the array, so it accepts `…ip=10.0.0.11` for an expected `…ip=10.0.0.1`.
+  Object key order does not affect `eq`, `enum`, or `containsElement`; array order and scalar
+  types remain significant.
 
 ## Embedded documents (`decode`)
 
@@ -107,12 +109,14 @@ Notes:
 - `decode.required` defaults to `true`: deleting the carrier is an `absence` finding, not a file
   on which every assertion vacuously passes.
 - A carrier that is not a string is a `mismatch`; embedded content that does not parse is a
-  `parse-error` on the containing file. Neither aborts the run.
+  `parse-error` on the containing file, always at error severity even for a warning-level rule.
+  Neither aborts the run.
 - Findings inside an embedded document carry `embeddedIn` (the outer path of the carrier) while
   `docPath` stays relative to the embedded document, so it round-trips against it.
-- Positions map exactly for literal block scalars (`|`, `|-`). Folded (`>`) and quoted scalars
-  re-wrap or unescape their source, so inner line N is not outer line N + k: those degrade to the
-  carrier's own position and emit an advisory note saying so.
+- Positions map exactly for literal block scalars, including explicit indentation indicators
+  such as `|2-`. Folded (`>`) and quoted scalars re-wrap or unescape their source, so inner line N
+  is not outer line N + k: those degrade to the carrier's own position and emit an advisory note
+  saying so.
 
 ## Examples
 

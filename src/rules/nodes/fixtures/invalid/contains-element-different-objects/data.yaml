@@ -1,0 +1,5 @@
+items:
+  - {name: web, metadata: {tier: edge, zone: a}, ports: [443, 80]}
+  - {name: web, metadata: {tier: edge, zone: a}, ports: ["80", "443"]}
+  - {name: web, metadata: {tier: edge}, ports: [80, 443]}
+  - {name: web, metadata: {tier: edge, zone: a, extra: true}, ports: [80, 443]}

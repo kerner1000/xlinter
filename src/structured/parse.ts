@@ -167,11 +167,16 @@ function sourceLookup(doc: Document, lineCounter: LineCounter): SourceOf {
     if (!lastProp || typeof lastProp.offset !== "number") return undefined;
     if (typeof lastProp.source !== "string") return undefined;
     const contentStart = lastProp.offset + lastProp.source.length;
-    const contentLines = src.source.split("\n").filter((l) => l.trim() !== "");
-    if (contentLines.length === 0) return undefined;
-    const indent = Math.min(
-      ...contentLines.map((l) => l.length - l.trimStart().length),
-    );
+    const firstContentLine = src.source.split("\n").find((line) => /[^ ]/.test(line));
+    if (firstContentLine === undefined) return undefined;
+    const header = src.props[0];
+    if (header?.type !== "block-scalar-header") return undefined;
+    const explicitIndent = /[1-9]/.exec(header.source)?.[0];
+    // The parser strips parent indentation plus an explicit indicator; any
+    // remaining spaces already contribute to the inner parser's columns.
+    const indent = explicitIndent === undefined
+      ? firstContentLine.search(/[^ ]/)
+      : src.indent + Number(explicitIndent);
     return { contentStartLine: lineCounter.linePos(contentStart).line, indent };
   };
 }

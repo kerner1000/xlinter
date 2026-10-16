@@ -1,0 +1,17 @@
+options:
+  parse: yaml
+  select: '$'
+  assert:
+    - path: '$.items'
+      required: true
+      containsElement:
+        name: web
+        metadata: {tier: edge, zone: a}
+        ports: [80, 443]
+include: ["data.yaml"]
+expected:
+  outcome: error
+  findings:
+    - file: data.yaml
+      kind: absence
+      messageIncludes: does not contain the required element

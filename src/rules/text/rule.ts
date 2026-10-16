@@ -75,7 +75,7 @@ export const textRule = defineRule<Options>({
         }
       }
       if (ctx.options.requireMatch.length > 0 || ctx.options.forbidMatch.length > 0) {
-        const lines = text.split("\n");
+        const lines = text.split(/\r?\n/);
         for (const pattern of ctx.options.requireMatch) {
           const re = new RegExp(pattern);
           if (!lines.some((l) => re.test(l))) {
