@@ -23,7 +23,13 @@ const ALWAYS_PACKED = /^(package\.json|(readme|copying|licen[cs]e)(\..+)?)$/i;
 /** Whether a packed path falls under a `files` entry (the entry itself or anything below it). */
 function covers(entry: string, file: string): boolean {
   const pattern = entry.replace(/^\.?\/+/, "").replace(/\/+$/, "");
-  return path.matchesGlob(file, pattern) || path.matchesGlob(file, `${pattern}/**`);
+  // A literal directory covers hidden descendants too; matchesGlob excludes them.
+  return (
+    file === pattern ||
+    file.startsWith(`${pattern}/`) ||
+    path.matchesGlob(file, pattern) ||
+    path.matchesGlob(file, `${pattern}/**`)
+  );
 }
 
 interface PackAudit {
@@ -43,11 +49,11 @@ function auditPack(entries: readonly string[], packed: readonly string[]): PackA
 }
 
 /** The paths `npm pack` would put into the tarball, relative to the package root. */
-async function packedPaths(): Promise<string[]> {
+async function packedPaths(root = projectRoot): Promise<string[]> {
   const { stdout } = await execFileAsync(
     "npm",
     ["pack", "--dry-run", "--json", "--ignore-scripts"],
-    { cwd: projectRoot, maxBuffer: 16 * 1024 * 1024 },
+    { cwd: root, maxBuffer: 16 * 1024 * 1024 },
   );
   const [pack] = JSON.parse(stdout) as { files: { path: string }[] }[];
   if (!pack) throw new Error(`npm pack --json printed no package: ${stdout}`);
@@ -88,6 +94,22 @@ describe("published package contents", () => {
     expect(auditPack(["dist"], packed)).toEqual({
       deadEntries: [],
       unlistedFiles: ["tsconfig.json"],
+    });
+  });
+
+  it("covers hidden directory descendants without covering a sibling directory", async () => {
+    const root = fileURLToPath(new URL("./repos/packlist/", import.meta.url));
+    const packed = await packedPaths(root);
+    expect(packed).toEqual(
+      expect.arrayContaining([
+        "docs/.example.json",
+        "docs/.examples/snippet.json",
+        "docs-extra/.example.json",
+      ]),
+    );
+    expect(auditPack(["docs"], packed)).toEqual({
+      deadEntries: [],
+      unlistedFiles: ["docs-extra/.example.json"],
     });
   });
 });
