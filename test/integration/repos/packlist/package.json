@@ -1,0 +1,7 @@
+{
+  "name": "xlinter-packlist-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "files": ["docs"],
+  "main": "docs-extra/.example.json"
+}
