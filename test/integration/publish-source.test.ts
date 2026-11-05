@@ -54,14 +54,17 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
   return stdout.trim();
 }
 
+/** The tag the fixture package's version calls for. */
+const VERSION_TAG = "v1.0.0";
+
 interface Checkout {
   /** Temp directory holding the bare remote and the checkout. */
   root: string;
-  /** Working tree on `main`, clean and at the tip of the declared remote's `main`. */
+  /** Working tree on `main`, clean, at the tip of the declared remote's `main` and its version tag. */
   dir: string;
   /** The bare repository `repository.url` names. */
   remote: string;
-  /** The commit both sides start on. */
+  /** The commit both sides start on, which the version tag names. */
   first: string;
 }
 
@@ -96,7 +99,20 @@ async function createCheckout(): Promise<Checkout> {
   await git(dir, "commit", "--quiet", "-m", "first");
   await git(dir, "remote", "add", "origin", remote);
   await git(dir, "push", "--quiet", "origin", "main");
+  await moveVersionTag(dir);
   return { root, dir, remote, first: await git(dir, "rev-parse", "HEAD") };
+}
+
+/** Points the version tag at HEAD, locally and on the remote `origin` names. */
+async function moveVersionTag(dir: string, ...tagOptions: string[]): Promise<void> {
+  await git(dir, "tag", "--force", ...tagOptions, VERSION_TAG);
+  await git(dir, "push", "--quiet", "--force", "origin", `refs/tags/${VERSION_TAG}`);
+}
+
+/** Commits one change on a detached HEAD at `from`, leaving main alone, and returns the new commit. */
+async function commitOffMain(dir: string, from: string): Promise<string> {
+  await git(dir, "switch", "--quiet", "--detach", from);
+  return commitChange(dir, "off main\n");
 }
 
 /** Commits one change on the current branch and returns the new commit. */
@@ -171,14 +187,37 @@ const runDryRunPublish = (cwd: string): Promise<Run> =>
   );
 
 describe("publish source guard: accepted sources", () => {
-  it("passes a clean checkout at the remote main tip and names the commit", async () => {
+  it("passes a clean checkout of the version tag on main and names the commit", async () => {
     const { dir, first } = await createCheckout();
     const result = await runGuard(dir);
     expect(result.stderr).toBe("");
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("publish source OK");
     expect(result.stdout).toContain(first);
+    expect(result.stdout).toContain(VERSION_TAG);
     expect(await git(dir, "status", "--porcelain")).toBe("");
+  });
+
+  it("passes the tagged commit once main has moved past it, as in a release build", async () => {
+    const { dir, first } = await createCheckout();
+    await commitChange(dir, "two\n");
+    await git(dir, "push", "--quiet", "origin", "main");
+    await git(dir, "switch", "--quiet", "--detach", first);
+
+    const result = await runGuard(dir);
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(first);
+  });
+
+  it("resolves an annotated tag to its commit", async () => {
+    const { dir, first } = await createCheckout();
+    await moveVersionTag(dir, "--annotate", "--message", "release");
+    expect(await git(dir, "rev-parse", `refs/tags/${VERSION_TAG}`)).not.toBe(first);
+
+    const result = await runGuard(dir);
+    expect(result.stderr).toBe("");
+    expect(result.code).toBe(0);
   });
 
   it("accepts the git+ URL form that package.json uses", async () => {
@@ -187,16 +226,17 @@ describe("publish source guard: accepted sources", () => {
       manifest.repository = { type: "git", url: `git+file://${remote}` };
     });
     await git(dir, "push", "--quiet", "origin", "main");
+    await moveVersionTag(dir);
 
     const result = await runGuard(dir);
     expect(result.stderr).toBe("");
     expect(result.code).toBe(0);
   });
 
-  it("passes a detached linked worktree at the tip, the documented release path", async () => {
+  it("passes a detached linked worktree, where .git is a file", async () => {
     const { root, dir, first } = await createCheckout();
     const worktree = path.join(root, "release");
-    await git(dir, "worktree", "add", "--quiet", "--detach", worktree, "origin/main");
+    await git(dir, "worktree", "add", "--quiet", "--detach", worktree, VERSION_TAG);
     const result = await runGuard(worktree);
     expect(result.stderr).toBe("");
     expect(result.code).toBe(0);
@@ -212,62 +252,98 @@ describe("publish source guard: accepted sources", () => {
 });
 
 describe("publish source guard: wrong commit", () => {
-  it("refuses a superseded commit behind the remote main tip", async () => {
+  it("refuses a commit on main that the version tag does not name", async () => {
     const { dir, first } = await createCheckout();
     const tip = await commitChange(dir, "two\n");
     await git(dir, "push", "--quiet", "origin", "main");
-    await git(dir, "reset", "--quiet", "--hard", first);
 
-    expectRefused(await runGuard(dir), first, tip);
+    const result = await runGuard(dir);
+    expectRefused(result, tip, first);
+    expect(result.stderr).not.toContain("not on main");
+  });
+
+  it("refuses a tagged commit that main does not contain", async () => {
+    const { dir, first } = await createCheckout();
+    const offMain = await commitOffMain(dir, first);
+    await moveVersionTag(dir);
+
+    const result = await runGuard(dir);
+    expectRefused(result, `HEAD ${offMain} is not on main`);
+    expect(result.stderr).not.toContain("the commit v1.0.0 names");
+  });
+
+  it("refuses a version with no tag, naming the tag it needs", async () => {
+    const { dir } = await createCheckout();
+    await commitManifest(dir, (manifest) => {
+      manifest.version = "1.0.1";
+    });
+    await git(dir, "push", "--quiet", "origin", "main");
+
+    expectRefused(await runGuard(dir), "has no tag v1.0.1");
+  });
+
+  it("asks the remote rather than trusting a local tag", async () => {
+    const { dir } = await createCheckout();
+    await git(dir, "push", "--quiet", "origin", `:refs/tags/${VERSION_TAG}`);
+    expect(await git(dir, "tag", "--list", VERSION_TAG)).toBe(VERSION_TAG);
+
+    expectRefused(await runGuard(dir), `has no tag ${VERSION_TAG}`);
   });
 
   it("asks the remote rather than trusting a stale local origin/main", async () => {
     const { dir, first } = await createCheckout();
-    const tip = await commitChange(dir, "two\n");
-    await git(dir, "push", "--quiet", "origin", "main");
-    await git(dir, "reset", "--quiet", "--hard", first);
-    await git(dir, "update-ref", "refs/remotes/origin/main", first);
-    expect(await git(dir, "rev-parse", "origin/main")).toBe(await git(dir, "rev-parse", "HEAD"));
+    const offMain = await commitOffMain(dir, first);
+    await moveVersionTag(dir);
+    await git(dir, "update-ref", "refs/remotes/origin/main", offMain);
 
-    expectRefused(await runGuard(dir), tip);
+    expectRefused(await runGuard(dir), `HEAD ${offMain} is not on main`);
   });
 
-  it("refuses a local commit ahead of the remote main tip", async () => {
+  it("refuses a local commit ahead of the remote", async () => {
     const { dir, first } = await createCheckout();
     const ahead = await commitChange(dir, "two\n");
 
-    expectRefused(await runGuard(dir), ahead, first);
+    expectRefused(await runGuard(dir), ahead, first, "is not on main");
   });
 
-  it("does not trust a repointed origin that holds the local commit", async () => {
+  it("does not trust a repointed origin that holds the local commit and tag", async () => {
     const { root, dir, first } = await createCheckout();
     const ahead = await commitChange(dir, "two\n");
     const fork = path.join(root, "fork.git");
     await git(root, "init", "--quiet", "--bare", "--initial-branch=main", fork);
     await git(dir, "remote", "set-url", "origin", fork);
     await git(dir, "push", "--quiet", "origin", "main");
+    await moveVersionTag(dir);
 
-    expectRefused(await runGuard(dir), ahead, first);
+    expectRefused(await runGuard(dir), ahead, first, "is not on main");
   });
 
   it("is not fooled by a branch whose name ends in the main ref", async () => {
     const { dir, first } = await createCheckout();
-    const tip = await commitChange(dir, "two\n");
-    await git(dir, "push", "--quiet", "origin", "main");
-    await git(dir, "push", "--quiet", "origin", `${first}:refs/heads/a/refs/heads/main`);
-    await git(dir, "reset", "--quiet", "--hard", first);
+    const offMain = await commitOffMain(dir, first);
+    await moveVersionTag(dir);
+    await git(dir, "push", "--quiet", "origin", `${offMain}:refs/heads/a/refs/heads/main`);
 
-    expectRefused(await runGuard(dir), first, tip);
+    expectRefused(await runGuard(dir), `HEAD ${offMain} is not on main`);
   });
 
-  it("compares with main, not with whatever branch the remote HEAD names", async () => {
-    const { dir, remote, first } = await createCheckout();
+  it("is not fooled by a tag whose name ends in the version tag ref", async () => {
+    const { dir, first } = await createCheckout();
+    await git(dir, "push", "--quiet", "origin", `:refs/tags/${VERSION_TAG}`);
+    await git(dir, "push", "--quiet", "origin", `${first}:refs/tags/a/refs/tags/${VERSION_TAG}`);
+
+    expectRefused(await runGuard(dir), `has no tag ${VERSION_TAG}`);
+  });
+
+  it("checks main, not whatever branch the remote HEAD names", async () => {
+    const { dir, remote } = await createCheckout();
     await git(dir, "switch", "--quiet", "-c", "other");
     const other = await commitChange(dir, "two\n");
     await git(dir, "push", "--quiet", "origin", "other");
+    await moveVersionTag(dir);
     await git(remote, "symbolic-ref", "HEAD", "refs/heads/other");
 
-    expectRefused(await runGuard(dir), other, first);
+    expectRefused(await runGuard(dir), `HEAD ${other} is not on main`);
   });
 });
 
@@ -387,7 +463,16 @@ describe("publish source guard: fails closed", () => {
       manifest.repository = { type: "git", url: empty };
     });
 
-    expectRefused(await runGuard(dir), UNVERIFIED, "has no refs/heads/main");
+    expectRefused(await runGuard(dir), UNVERIFIED, "refs/heads/main");
+  });
+
+  it("when the clone is shallow, whose history cannot show what main contains", async () => {
+    const { root, remote } = await createCheckout();
+    const shallow = path.join(root, "shallow");
+    await git(root, "clone", "--quiet", "--depth=1", `file://${remote}`, shallow);
+    expect(await git(shallow, "rev-parse", "--is-shallow-repository")).toBe("true");
+
+    expectRefused(await runGuard(shallow), UNVERIFIED, "shallow");
   });
 
   it("when the package declares no repository", async () => {
@@ -421,7 +506,7 @@ describe("publish source guard: fails closed", () => {
 });
 
 describe("publish source guard through npm publish", () => {
-  it("lets a publish from the remote main tip reach the pack", async () => {
+  it("lets a publish from the version tag reach the pack", async () => {
     const { dir } = await createCheckout();
 
     const result = await runDryRunPublish(dir);
