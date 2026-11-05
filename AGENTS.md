@@ -36,14 +36,17 @@ for tests, zod 4 for config validation, `yaml` for parsing, `markdownlint` exact
 
 ## Releasing
 
-`npm publish` packs the working tree, so the checkout is the release, and a published version number
-can never be reused. `prepublishOnly` guards both the source and the build:
-`scripts/check-publish-source.mjs` refuses anything but a checkout with no local changes at the current
-tip of `main` in the repository `repository.url` declares, `npm run verify` rebuilds `dist/` from empty
-and runs every CI check, then the source check runs again. It does not look at `node_modules`, which
-is why step 3 starts with `npm ci`. Only `main` can be released; publishing from a maintenance branch
-would need a change to this gate. The gate catches mistakes rather than deliberate bypasses: local Git
-config such as `core.worktree` or `url.*.insteadOf` can mislead it.
+A published version number can never be reused, so a release comes from a workflow and not from a
+checkout. Pushing tag `v<version>` runs `.github/workflows/release.yml`, which stages the package on npm
+through trusted publishing, with no long-lived token. Nothing is public until a maintainer approves it
+with 2FA, and the published version carries a provenance attestation naming the commit.
+
+The `build` job runs `npm run prepublishOnly`. `scripts/check-publish-source.mjs` refuses anything but a
+checkout with no local changes at the commit tag `v<version>` names, with that commit on `main`, both in
+the repository `repository.url` declares. `npm run verify` then rebuilds `dist/` from empty and runs every
+CI check, and the source check runs again. Only the `publish` job can get an OIDC token for npm, and it
+only stages the tarball `build` packed; npm runs no scripts for a tarball. The `release-workflow` self-lint
+rule pins that split, because CI never runs this workflow.
 
 The `package-contract` self-lint rule requires the package identity, license, module type, Node minimum,
 repository URL, and release-gate scripts. It pins the exact `files` array; the packlist test separately
@@ -51,20 +54,34 @@ checks what npm actually packs. It forbids `prepack`, `prepare`, `postpack`, `pu
 which run after `prepublishOnly`'s final source check. Intentional packaging or lifecycle changes must
 update `.xlinter.yaml` in the same PR. Version and descriptive metadata remain free to change.
 
+The trusted publisher on npmjs.com names `kerner1000/xlinter` and `release.yml`, with no environment, and
+allows `npm stage publish` only. Renaming the workflow file stops releases until the publisher is
+recreated. A new publisher expires unless its first publish succeeds within 2 days.
+
 1. Merge the version bump to `main` and wait for CI.
-2. From the canonical checkout, create a fresh detached worktree:
+2. Tag that commit:
 
    ```bash
    git fetch origin main
-   git worktree add --detach ../xlinter.worktrees/release-<version> origin/main
+   git push origin <sha>:refs/tags/v<version>
    ```
 
-3. In that worktree run `npm ci`, then `npm publish --dry-run`. Its output must include the
-   `publish source OK` line twice, and the file list must be what you expect to ship.
-4. Run `npm publish`.
-5. Run `npm view xlinter version`. The registry can take a few minutes to show the new version.
-6. Remove the worktree.
+3. Wait for the `release` workflow. If `build` refuses the source, nothing reached npm. Delete a wrong tag
+   with `git push origin :refs/tags/v<version>` and tag the right commit.
+4. Run `npm stage list xlinter`, then `npm stage download <stage-id>` and check what it would ship.
+5. Run `npm stage approve <stage-id>`, or `npm stage reject <stage-id>` if it is wrong.
+6. Run `npm view xlinter@<version> dist.attestations`. The registry can take a few minutes to show the
+   new version.
 
-`--ignore-scripts`, `ignore-scripts=true` in an npm config, and publishing a prebuilt tarball all skip
-this gate without any message. Do not publish that way. Check `npm config get ignore-scripts` if the
-dry run does not show the `publish source OK` line.
+Only `main` can be released; a maintenance branch would need a change to the gate. The workflow's tag
+filter does not match pre-release versions.
+
+If the workflow cannot run, publish from a fresh detached worktree of the tag: `npm ci`, then
+`npm publish --dry-run`, whose output must include the `publish source OK` line twice, then `npm publish`,
+which prompts for 2FA and produces no attestation. `prepublishOnly` applies the same gate there, and it
+does not look at `node_modules`, which is why this starts with `npm ci`.
+
+The gate catches mistakes rather than deliberate bypasses. `--ignore-scripts`, `ignore-scripts=true` in an
+npm config, and publishing a prebuilt tarball all skip it locally without any message, so do not publish
+that way. Check `npm config get ignore-scripts` if the dry run does not show the `publish source OK` line.
+Local Git config such as `core.worktree` or `url.*.insteadOf` can mislead it.
