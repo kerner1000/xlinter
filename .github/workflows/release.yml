@@ -1,0 +1,56 @@
+# The trusted publisher on npmjs.com names this file, so renaming it stops releases.
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # Full history, because the source check needs it to tell whether the tagged commit is on main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # No dependency cache, so the release builds from the lockfile alone.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          check-latest: true
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      # The source check, every CI check, then the source check again.
+      - run: npm run prepublishOnly
+      # Scripts off, so the tarball holds what those checks saw.
+      - run: npm pack --ignore-scripts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: package
+          path: xlinter-*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  # The only job that can get an OIDC token for npm, so it runs no project code or dependencies.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      # npm stage needs npm 11.15.0 or later, which only Node 24.18.0 or later bundles.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          check-latest: true
+          package-manager-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: package
+      # Nothing is public until a maintainer approves it with 2FA. npm runs no scripts for a tarball.
+      - run: npm stage publish ./xlinter-*.tgz
