@@ -51,9 +51,15 @@ rules:
     parse: json
     select: "$"
     assert:
-      - { path: "$.license", eq: "Apache-2.0" }
-      - { path: "$.type", eq: "module" }
-      - { path: "$.engines.node", eq: ">=22" }
+      - { path: "$.name", required: true, eq: "xlinter" }
+      - { path: "$.license", required: true, eq: "Apache-2.0" }
+      - { path: "$.type", required: true, eq: "module" }
+      - { path: "$.engines.node", required: true, eq: ">=22" }
+      # Pin the intended allowlist; the packlist test checks what npm actually packs.
+      # A packaging change must deliberately update this policy too (including order).
+      - path: "$.files"
+        required: true
+        eq: [dist, docs, schema, LICENSE, README.md]
       # The release gate. CI and prepublishOnly both trust these values, so a change to any of them
       # has to be deliberate. `required` matters: without it, deleting one passes.
       - path: "$.repository.url"
@@ -71,6 +77,14 @@ rules:
       - path: "$.scripts.prepublishOnly"
         required: true
         eq: "node scripts/check-publish-source.mjs && npm run verify && node scripts/check-publish-source.mjs"
+      # These run after prepublishOnly's final source check. Keep the release lifecycle
+      # there: prepack/prepare can change packed files; postpack runs after packing;
+      # publish/postpublish run after publication.
+      - { path: "$.scripts.prepack", absent: true }
+      - { path: "$.scripts.prepare", absent: true }
+      - { path: "$.scripts.postpack", absent: true }
+      - { path: "$.scripts.publish", absent: true }
+      - { path: "$.scripts.postpublish", absent: true }
 adapters:
   markdownlint:
     config: .markdownlint.yaml

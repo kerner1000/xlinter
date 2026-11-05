@@ -43,8 +43,13 @@ tip of `main` in the repository `repository.url` declares, `npm run verify` rebu
 and runs every CI check, then the source check runs again. It does not look at `node_modules`, which
 is why step 3 starts with `npm ci`. Only `main` can be released; publishing from a maintenance branch
 would need a change to this gate. The gate catches mistakes rather than deliberate bypasses: local Git
-config such as `core.worktree` or `url.*.insteadOf` can mislead it, and a script added to `main` that
-runs later in the publish, such as `prepack`, is outside it.
+config such as `core.worktree` or `url.*.insteadOf` can mislead it.
+
+The `package-contract` self-lint rule requires the package identity, license, module type, Node minimum,
+repository URL, and release-gate scripts. It pins the exact `files` array; the packlist test separately
+checks what npm actually packs. It forbids `prepack`, `prepare`, `postpack`, `publish`, and `postpublish`,
+which run after `prepublishOnly`'s final source check. Intentional packaging or lifecycle changes must
+update `.xlinter.yaml` in the same PR. Version and descriptive metadata remain free to change.
 
 1. Merge the version bump to `main` and wait for CI.
 2. From the canonical checkout, create a fresh detached worktree:
