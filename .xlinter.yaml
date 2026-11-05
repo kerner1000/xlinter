@@ -45,6 +45,36 @@ rules:
     targets: { include: ["AGENTS.md", "CLAUDE.md"] }
     left: AGENTS.md
     right: CLAUDE.md
+  # Only the publish job can get an OIDC token for npm, and it runs nothing but npm on the tarball the
+  # build job packed after the publish gate. npm runs no scripts for a tarball, so the build job is the
+  # only place that gate runs. CI never runs a workflow that fires on a tag, so this is its automated check.
+  release-workflow:
+    type: nodes
+    targets: { include: [".github/workflows/release.yml"] }
+    parse: yaml
+    select: "$"
+    requireMatch: true
+    assert:
+      - { path: "$.permissions", required: true, eq: {} }
+      - { path: "$.env", absent: true }
+      - { path: "$.jobs.build.permissions", required: true, eq: { contents: read } }
+      - { path: "$.jobs.build.steps[?@.run == 'npm run prepublishOnly'].run", required: true }
+      - { path: "$.jobs.build.steps[?@.run == 'npm pack --ignore-scripts'].run", required: true }
+      - { path: "$.jobs.publish.permissions", required: true, eq: { id-token: write } }
+      - { path: "$.jobs.publish.env", absent: true }
+      - { path: "$.jobs.publish.steps[*].env", absent: true }
+      - path: "$.jobs.publish.steps[*].run"
+        required: true
+        eq: "npm stage publish ./xlinter-*.tgz"
+      - path: "$.jobs.publish.steps[*].uses"
+        required: true
+        regex: '^actions/(setup-node|download-artifact)@'
+      - path: "$.jobs.*.steps[*].uses"
+        required: true
+        regex: '@[0-9a-f]{40}$'
+    order:
+      - before: "$.jobs.build.steps[?@.run == 'npm run prepublishOnly']"
+        after: "$.jobs.build.steps[?@.run == 'npm pack --ignore-scripts']"
   package-contract:
     type: nodes
     targets: { include: ["package.json"] }
