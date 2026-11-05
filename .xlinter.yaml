@@ -54,6 +54,23 @@ rules:
       - { path: "$.license", eq: "Apache-2.0" }
       - { path: "$.type", eq: "module" }
       - { path: "$.engines.node", eq: ">=22" }
+      # The release gate. CI and prepublishOnly both trust these values, so a change to any of them
+      # has to be deliberate. `required` matters: without it, deleting one passes.
+      - path: "$.repository.url"
+        required: true
+        eq: "git+https://github.com/kerner1000/xlinter.git"
+      - path: "$.scripts.build"
+        required: true
+        eq: "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json"
+      - path: "$.scripts.test"
+        required: true
+        eq: "npm run build && tsc -p tsconfig.json && vitest run"
+      - path: "$.scripts.verify"
+        required: true
+        eq: "npm test && node dist/cli/main.js . && node dist/cli/main.js . --format json > /dev/null && node dist/cli/main.js rules --check-docs && node dist/tools/generate-schema.js && git diff --exit-code -- schema/xlinter-config.schema.json"
+      - path: "$.scripts.prepublishOnly"
+        required: true
+        eq: "node scripts/check-publish-source.mjs && npm run verify && node scripts/check-publish-source.mjs"
 adapters:
   markdownlint:
     config: .markdownlint.yaml
