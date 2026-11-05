@@ -21,13 +21,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: npx vitest run
-      - name: self-lint
-        run: node dist/cli/main.js . --format json > /dev/null && node dist/cli/main.js .
-      - name: rule docs complete
-        run: node dist/cli/main.js rules --check-docs
-      - name: schema not stale
-        run: |
-          node dist/tools/generate-schema.js
-          git diff --exit-code -- schema/xlinter-config.schema.json
+      # The same checks gate npm publish through prepublishOnly.
+      - run: npm run verify
+      # Outside verify, so the package-contract rule still runs if verify itself is edited down.
+      - name: package contract
+        run: node dist/cli/main.js .
