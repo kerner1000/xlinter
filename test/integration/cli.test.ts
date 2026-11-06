@@ -293,6 +293,61 @@ describe("invalid command-line arguments through the built CLI", () => {
   });
 });
 
+describe("the format of an error through the built CLI", () => {
+  async function expectEnvelope(args: string[], fixture: string, text: string): Promise<void> {
+    const { code, stdout, stderr } = await runCli(args, repo(fixture));
+    expect(code).toBe(2);
+    expect(stderr).toBe("");
+    const envelope = JSON.parse(stdout) as {
+      schemaVersion: number;
+      configErrors: { message: string }[];
+    };
+    expect(envelope.schemaVersion).toBe(1);
+    expect(envelope.configErrors.map((e) => e.message).join("\n")).toContain(text);
+  }
+
+  const sources: [label: string, args: string[], fixture: string, text: string][] = [
+    ["a bad config", [], "bad-config", "versionn"],
+    ["a value main rejects", ["--fail-on", "never"], "clean", "--fail-on"],
+    ["an unknown option", ["--output", "x.json"], "clean", "--output"],
+    ["an unknown option on a subcommand", ["rules", "--bogus"], "clean", "--bogus"],
+  ];
+
+  for (const spelling of [["--format", "json"], ["--format=json"]]) {
+    for (const [label, args, fixture, text] of sources) {
+      it(`${spelling.join(" ")} reports ${label} in the configErrors envelope`, () =>
+        expectEnvelope([...args, ...spelling], fixture, text));
+    }
+  }
+
+  it("the last --format wins when it is json", () =>
+    expectEnvelope(["--format", "human", "--format", "json", "--fail-on", "never"], "clean", "--fail-on"));
+
+  const humanCases: [args: string[], text: string][] = [
+    [["--config", "json"], "json"],
+    [["--config=json"], "json"],
+    [["explain", "json"], '"json"'],
+    [["json", "--fail-on", "never"], "--fail-on"],
+    [["--rules", "json", "--output", "x.json"], "--output"],
+    [["--fail-on", "never", "--", "--format", "json"], "--fail-on"],
+    // The last --format wins, as it does when the run succeeds.
+    [["--format", "json", "--format", "human", "--fail-on", "never"], "--fail-on"],
+    // Node reads --format as the value of --config and rejects that as ambiguous, so no
+    // --format option was given.
+    [["--config", "--format", "json"], "--config"],
+  ];
+
+  for (const [args, text] of humanCases) {
+    it(`${args.join(" ")} reports one line on stderr`, async () => {
+      const { code, stdout, stderr } = await runCli(args, repo("clean"));
+      expect(code).toBe(2);
+      expect(stdout).toBe("");
+      expect(stderr).toMatch(/^config error: [^\n]+\n$/);
+      expect(stderr).toContain(text);
+    });
+  }
+});
+
 /** Exercise policy findings through the real CLI and its exit-code contract. */
 async function lintRuleFixture(rule: Record<string, unknown>, files: Record<string, string>) {
   const dir = await mkdtemp(path.join(tmpdir(), "xlinter-rule-"));
