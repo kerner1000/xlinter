@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { lintProject } from "../../src/index.js";
+import { lintProject, XlinterConfigError } from "../../src/index.js";
 
 const reposDir = fileURLToPath(new URL("./repos/", import.meta.url));
 const configOf = (repo: string): string => path.join(reposDir, repo, ".xlinter.yaml");
@@ -130,5 +130,27 @@ describe("lintProject end-to-end", () => {
       kind: "other",
     });
     expect(audit?.locator.file).toBe("AGENTS.md");
+  });
+
+  it("rejects paths that do not exist with one detail each, not by exiting", async () => {
+    const cwd = path.join(reposDir, "clean");
+    const error: unknown = await lintProject({
+      cwd,
+      paths: ["no-such-a", "docs", "no-such-b"],
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(XlinterConfigError);
+    expect((error as XlinterConfigError).details).toEqual([
+      { message: `lint path not found: no-such-a (${path.join(cwd, "no-such-a")})` },
+      { message: `lint path not found: no-such-b (${path.join(cwd, "no-such-b")})` },
+    ]);
+  });
+
+  it("resolves relative paths against cwd, not the process directory", async () => {
+    const result = await lintProject({ cwd: path.join(reposDir, "clean"), paths: ["docs"] });
+    expect(result.failed).toBe(false);
+    expect(result.instances.find((i) => i.ruleId === "local/doc-names")).toMatchObject({
+      outcome: "pass",
+      targetsMatched: 2,
+    });
   });
 });

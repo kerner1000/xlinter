@@ -27,6 +27,14 @@ npx xlinter .
 
 Requires Node >= 22.
 
+Paths narrow the run to those files or directories. A path that does not exist is a usage error
+(exit `2`), and a path that exists but matches no target is a normal run whose rule instances report
+`n/a`. xlinter does not expand globs. When passing a file list from git, leave deletions out:
+
+```bash
+npx xlinter $(git diff --name-only --diff-filter=d origin/main...)
+```
+
 ## Configuration
 
 `.xlinter.yaml` at the repository root. Rule *types* are engine code; your config instantiates

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -369,4 +369,127 @@ describe("review regressions through the built CLI", () => {
       expect(allowed.envelope.findings).toEqual([]);
     });
   }
+});
+
+describe("lint paths through the built CLI", () => {
+  const missingPaths: [label: string, arg: string][] = [
+    ["a path that does not exist", "no-such-path"],
+    ["a missing file in an existing directory", "docs/no-such-file.md"],
+    ["a path below a file", "docs/alpha.md/below"],
+    ["a glob, which is taken as a literal path", "docs/*.md"],
+  ];
+
+  for (const [label, arg] of missingPaths) {
+    it(`${label} exits 2 with one line on stderr`, async () => {
+      const { code, stdout, stderr } = await runCli([arg], repo("clean"));
+      expect(code).toBe(2);
+      expect(stdout).toBe("");
+      expect(stderr).toMatch(/^config error: lint path not found: [^\n]+\n$/);
+      expect(stderr).toContain(arg);
+    });
+  }
+
+  // On this repository's config, index-completeness reports that its index file is not among the
+  // narrowed targets, so this run used to exit 1 with a finding unrelated to the typo.
+  for (const [label, cwd] of [
+    ["a config whose rules can all be n/a", repo("clean")],
+    ["this repository's own config", projectRoot],
+  ] as const) {
+    it(`a mistyped subcommand on ${label} exits 2 and names the argument`, async () => {
+      const { code, stdout, stderr } = await runCli(["valdiate-config"], cwd);
+      expect(code).toBe(2);
+      expect(stdout).toBe("");
+      expect(stderr).toMatch(/^config error: lint path not found: valdiate-config \([^\n]+\)\n$/);
+    });
+  }
+
+  it("reports a missing path ahead of a broken config", async () => {
+    const { code, stderr } = await runCli(["no-such-path"], repo("bad-config"));
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/^config error: lint path not found: no-such-path \([^\n]+\)\n$/);
+  });
+
+  it("reports every missing path and does not lint the ones that exist", async () => {
+    const { code, stdout, stderr } = await runCli(["no-such-a", "docs", "no-such-b"], repo("clean"));
+    expect(code).toBe(2);
+    expect(stdout).toBe("");
+    const lines = stderr.trimEnd().split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("lint path not found: no-such-a");
+    expect(lines[1]).toContain("lint path not found: no-such-b");
+  });
+
+  it("--format json reports a missing path in the configErrors envelope", async () => {
+    const { code, stdout, stderr } = await runCli(["no-such-path", "--format", "json"], repo("clean"));
+    expect(code).toBe(2);
+    expect(stderr).toBe("");
+    const envelope = JSON.parse(stdout) as {
+      schemaVersion: number;
+      configErrors: { message: string }[];
+    };
+    expect(envelope.schemaVersion).toBe(1);
+    expect(envelope.configErrors).toEqual([
+      { message: expect.stringContaining("lint path not found: no-such-path") },
+    ]);
+  });
+
+  it("--list-targets reports a missing path instead of listing targets", async () => {
+    const { code, stdout, stderr } = await runCli(["no-such-path", "--list-targets"], repo("clean"));
+    expect(code).toBe(2);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("lint path not found: no-such-path");
+  });
+
+  it("--list-targets accepts a path that exists", async () => {
+    const { code, stdout } = await runCli(["docs", "--list-targets"], repo("clean"));
+    expect(code).toBe(0);
+    expect(stdout).toContain("docs/alpha.md");
+  });
+
+  it("a path that exists but matches no target stays a normal n/a run", async () => {
+    // repos/basic exists, but it is outside the root of repos/clean.
+    const human = await runCli(["../basic"], repo("clean"));
+    expect(human.code).toBe(0);
+    expect(human.stderr).toBe("");
+    expect(human.stdout).toContain("PASS: 2 rule instance(s) — 0 pass, 2 n/a");
+
+    const json = await runCli(["../basic", "--format", "json"], repo("clean"));
+    expect(json.code).toBe(0);
+    const envelope = JSON.parse(json.stdout) as RunResult;
+    expect(envelope.instances).toHaveLength(2);
+    for (const instance of envelope.instances) {
+      expect(instance).toMatchObject({ outcome: "na", targetsMatched: 0 });
+    }
+  });
+
+  for (const [label, arg, matched] of [
+    ["an existing directory", "docs", 2],
+    ["an existing file", "docs/alpha.md", 1],
+  ] as const) {
+    it(`${label} still narrows the run`, async () => {
+      const { code, stdout } = await runCli([arg, "--format", "json"], repo("clean"));
+      expect(code).toBe(0);
+      const envelope = JSON.parse(stdout) as RunResult;
+      expect(envelope.instances.find((i) => i.ruleId === "local/doc-names")).toMatchObject({
+        outcome: "pass",
+        targetsMatched: matched,
+      });
+    });
+  }
+
+  it("a dangling symlink exists: it is a target, not a missing path", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "xlinter-paths-"));
+    fixtureDirs.push(dir);
+    await writeFile(path.join(dir, ".xlinter.yaml"), JSON.stringify({
+      version: 1,
+      discovery: "walk",
+      rules: { probe: { type: "file-name", targets: { include: ["dangling"] }, pattern: ".*" } },
+    }));
+    await symlink("no-such-target", path.join(dir, "dangling"));
+    const { code, stdout, stderr } = await runCli(["dangling", "--format", "json"], dir);
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    const envelope = JSON.parse(stdout) as RunResult;
+    expect(envelope.instances).toMatchObject([{ targetsMatched: 1 }]);
+  });
 });

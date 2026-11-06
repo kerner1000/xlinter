@@ -1,4 +1,4 @@
-import { lintProject, resolveConfigForCwd } from "../../engine/engine.js";
+import { assertPathsExist, lintProject, resolveConfigForCwd } from "../../engine/engine.js";
 import { resolveTargets } from "../../engine/targets.js";
 import { formatHuman } from "../formats/human.js";
 import { formatJson } from "../formats/json.js";
@@ -13,6 +13,7 @@ export interface LintCliOptions {
 
 export async function runLint(paths: string[], opts: LintCliOptions): Promise<number> {
   if (opts.listTargets) {
+    await assertPathsExist(paths, process.cwd());
     const config = await resolveConfigForCwd({
       ...(opts.configFile !== undefined ? { configFile: opts.configFile } : {}),
     });
