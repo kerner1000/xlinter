@@ -19,32 +19,46 @@ import { runValidateConfig } from "./commands/validate-config.js";
 
 const SUBCOMMANDS = new Set(["explain", "rules", "validate-config"]);
 
+const CLI_OPTIONS = {
+  config: { type: "string" },
+  format: { type: "string", default: "human" },
+  "fail-on": { type: "string", default: "error" },
+  rules: { type: "string" },
+  "list-targets": { type: "boolean", default: false },
+  "check-docs": { type: "boolean", default: false },
+  help: { type: "boolean", short: "h", default: false },
+} as const;
+
 /**
  * parseArgs reports bad arguments as ERR_PARSE_ARGS_* errors: a usage error, not a crash. Any
- * other error here is a bug in the options below. Node words some of its messages over several
- * lines, so they are folded into the one line a config error gets.
+ * other error here is a bug in CLI_OPTIONS. Node words some of its messages over several lines,
+ * so they are folded into the one line a config error gets.
  */
 function parseCliArgs(args: string[]) {
   try {
-    return parseArgs({
-      args,
-      allowPositionals: true,
-      options: {
-        config: { type: "string" },
-        format: { type: "string", default: "human" },
-        "fail-on": { type: "string", default: "error" },
-        rules: { type: "string" },
-        "list-targets": { type: "boolean", default: false },
-        "check-docs": { type: "boolean", default: false },
-        help: { type: "boolean", short: "h", default: false },
-      },
-    });
+    return parseArgs({ args, allowPositionals: true, options: CLI_OPTIONS });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code?.startsWith("ERR_PARSE_ARGS_")) {
       throw XlinterConfigError.single((err as Error).message.replace(/\s*\n\s*/g, " "));
     }
     throw err;
   }
+}
+
+/**
+ * Whether the command line asked for JSON, for the error handler. It has no parsed values to read,
+ * because a rejected command line is one of the errors it reports. strict: false reads the same
+ * tokens without rejecting any, so a command line that parses gets the format it would have run
+ * with. An option missing its value takes the next argument, as Node reads it, so
+ * `--config --format json` does not ask for JSON.
+ */
+function wantsJson(): boolean {
+  const { values } = parseArgs({
+    args: process.argv.slice(2),
+    strict: false,
+    options: CLI_OPTIONS,
+  });
+  return values.format === "json";
 }
 
 async function main(): Promise<number> {
@@ -105,8 +119,7 @@ main().then(
   (code) => process.exit(code),
   (err) => {
     if (err instanceof XlinterConfigError) {
-      const wantJson = process.argv.includes("json");
-      if (wantJson) {
+      if (wantsJson()) {
         process.stdout.write(formatConfigErrorsJson(err.details) + "\n");
       } else {
         for (const d of err.details) {
