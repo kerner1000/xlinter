@@ -2,7 +2,12 @@ import path from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { discoverConfigFile, loadConfig } from "../config/extends.js";
-import { XlinterConfigError, type ResolvedConfig, type ResolvedRuleEntry } from "../config/types.js";
+import {
+  XlinterConfigError,
+  type ConfigErrorDetail,
+  type ResolvedConfig,
+  type ResolvedRuleEntry,
+} from "../config/types.js";
 import { builtinRegistry, loadPlugins, resolveType } from "../rule/registry.js";
 import {
   DocParseError,
@@ -27,7 +32,10 @@ export interface LintOptions {
   cwd?: string;
   /** Explicit config file (overrides discovery). */
   configFile?: string;
-  /** Narrow targets to these paths (files or directory prefixes, relative to cwd). */
+  /**
+   * Narrow targets to these paths (files or directory prefixes, relative to cwd). A path that does
+   * not exist rejects with XlinterConfigError; one that exists but matches no target is a normal run.
+   */
   paths?: string[];
   /** Run only these rule instance ids. */
   rulesFilter?: string[];
@@ -56,6 +64,11 @@ export async function resolveConfigForCwd(opts: LintOptions): Promise<ResolvedCo
  * the seam a future MCP server imports.
  */
 export async function lintProject(opts: LintOptions = {}): Promise<RunResult> {
+  const cwd = opts.cwd ?? process.cwd();
+  // Ahead of the config: the CLI reads a mistyped subcommand as a path, and it should be reported
+  // as such whatever state the config is in, without running any plugin code.
+  await assertPathsExist(opts.paths, cwd);
+
   const config = await resolveConfigForCwd(opts);
   const registry = builtinRegistry();
   await loadPlugins(registry, config.plugins, config.file);
@@ -63,7 +76,7 @@ export async function lintProject(opts: LintOptions = {}): Promise<RunResult> {
   const services = realServices();
   const { roots, targets } = await resolveTargets(config);
 
-  const narrowed = narrowTargets(targets, opts.paths, opts.cwd ?? process.cwd());
+  const narrowed = narrowTargets(targets, opts.paths, cwd);
   const invocations: InvocationResult[] = [];
 
   for (const entry of config.rules.values()) {
@@ -120,6 +133,26 @@ export async function lintProject(opts: LintOptions = {}): Promise<RunResult> {
   }
 
   return aggregate(invocations, config.exemptions, opts.failOn ?? "error");
+}
+
+/**
+ * A path the caller named must exist, or a typo narrows to nothing and reads as a clean run. The
+ * check is lstat-based, so a dangling symlink, which resolveTargets keeps as a target, is not
+ * missing. fs.stat also reports an unreadable path as missing, hence "not found".
+ */
+export async function assertPathsExist(
+  paths: readonly string[] | undefined,
+  cwd: string,
+): Promise<void> {
+  const { fs } = realServices();
+  const missing: ConfigErrorDetail[] = [];
+  for (const p of paths ?? []) {
+    const abs = path.resolve(cwd, p);
+    if ((await fs.stat(abs)).nodeType === "missing") {
+      missing.push({ message: `lint path not found: ${p} (${abs})` });
+    }
+  }
+  if (missing.length > 0) throw new XlinterConfigError(missing);
 }
 
 function narrowTargets(
