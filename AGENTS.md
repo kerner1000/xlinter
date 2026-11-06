@@ -9,8 +9,8 @@ for tests, zod 4 for config validation, `yaml` for parsing, `markdownlint` exact
 - **The engine contains zero consumer-specific policy.** Policy lives in consumer configs and
   preset packages. If a change encodes one user's convention into engine code, it is wrong.
 - **Stable public surface**: rule type IDs, config keys, finding fields, the JSON envelope
-  (`schemaVersion`), and exit codes (0 clean / 1 findings / 2 config error / 3 internal) are
-  compatibility surfaces — breaking them is a semver-major event.
+  (`schemaVersion`), and exit codes (0 clean / 1 findings / 2 config or usage error / 3 internal)
+  are compatibility surfaces — breaking them is a semver-major event.
 - **Fixture-first**: every rule type ships `fixtures/valid/**` and `fixtures/invalid/**` cases;
   `test/fixtures.test.ts` fails any registered rule missing either kind. New rule = new fixtures
   in the same change.

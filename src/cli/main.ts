@@ -19,24 +19,40 @@ import { runValidateConfig } from "./commands/validate-config.js";
 
 const SUBCOMMANDS = new Set(["explain", "rules", "validate-config"]);
 
+/**
+ * parseArgs reports bad arguments as ERR_PARSE_ARGS_* errors: a usage error, not a crash. Any
+ * other error here is a bug in the options below. Node words some of its messages over several
+ * lines, so they are folded into the one line a config error gets.
+ */
+function parseCliArgs(args: string[]) {
+  try {
+    return parseArgs({
+      args,
+      allowPositionals: true,
+      options: {
+        config: { type: "string" },
+        format: { type: "string", default: "human" },
+        "fail-on": { type: "string", default: "error" },
+        rules: { type: "string" },
+        "list-targets": { type: "boolean", default: false },
+        "check-docs": { type: "boolean", default: false },
+        help: { type: "boolean", short: "h", default: false },
+      },
+    });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code?.startsWith("ERR_PARSE_ARGS_")) {
+      throw XlinterConfigError.single((err as Error).message.replace(/\s*\n\s*/g, " "));
+    }
+    throw err;
+  }
+}
+
 async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const sub = argv[0] !== undefined && SUBCOMMANDS.has(argv[0]) ? argv[0] : "lint";
   const rest = sub === "lint" ? argv : argv.slice(1);
 
-  const { values, positionals } = parseArgs({
-    args: rest,
-    allowPositionals: true,
-    options: {
-      config: { type: "string" },
-      format: { type: "string", default: "human" },
-      "fail-on": { type: "string", default: "error" },
-      rules: { type: "string" },
-      "list-targets": { type: "boolean", default: false },
-      "check-docs": { type: "boolean", default: false },
-      help: { type: "boolean", short: "h", default: false },
-    },
-  });
+  const { values, positionals } = parseCliArgs(rest);
 
   if (values.help) {
     process.stdout.write(USAGE);

@@ -88,7 +88,7 @@ into xlinter's output with severity overrides per upstream rule).
 - `xlinter --format json` — versioned envelope, config errors included.
 - `xlinter explain <ruleId>` — the rule's doc page, offline.
 - `xlinter rules` / `xlinter validate-config` — discovery and self-validation for config authors.
-- Exit codes: `0` clean, `1` findings, `2` config error, `3` internal error.
+- Exit codes: `0` clean, `1` findings, `2` config or usage error, `3` internal error.
 - Every finding: stable `ruleId` + `ruleType`, `kind`, locator (file/line/docPath), `expected` /
   `found`, and a remediation sentence an agent can act on.
 - Exemptions are ratcheted: an exemption that suppressed nothing this run is itself an error —
