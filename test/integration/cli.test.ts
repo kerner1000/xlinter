@@ -254,6 +254,44 @@ describe("built CLI (dist/cli/main.js)", () => {
   );
 });
 
+describe("invalid command-line arguments through the built CLI", () => {
+  const cases: [label: string, args: string[], option: string][] = [
+    ["an unknown long option", [".", "--output", "x.json"], "--output"],
+    ["an unknown short option", ["-x"], "-x"],
+    ["an unknown option on rules", ["rules", "--bogus"], "--bogus"],
+    ["an unknown option on explain", ["explain", "file-name", "--bogus"], "--bogus"],
+    ["an unknown option on validate-config", ["validate-config", "--bogus"], "--bogus"],
+    ["a missing option value", ["--format"], "--format"],
+    ["a value on a boolean option", ["--list-targets=yes"], "--list-targets"],
+    // Node words this one over three lines.
+    ["an option where a value belongs", ["--config", "--rules"], "--config"],
+  ];
+
+  for (const [label, args, option] of cases) {
+    it(`${label} exits 2 with one line on stderr`, async () => {
+      const { code, stdout, stderr } = await runCli(args, repo("clean"));
+      expect(code).toBe(2);
+      expect(stdout).toBe("");
+      expect(stderr).toMatch(/^config error: [^\n]+\n$/);
+      expect(stderr).toContain(option);
+    });
+  }
+
+  it("--format json reports an unknown option in the configErrors envelope", async () => {
+    const { code, stdout, stderr } = await runCli(
+      ["--format", "json", "--output", "x.json"],
+      repo("clean"),
+    );
+    expect(code).toBe(2);
+    expect(stderr).toBe("");
+    const envelope = JSON.parse(stdout) as {
+      schemaVersion: number;
+      configErrors: { message: string }[];
+    };
+    expect(envelope.schemaVersion).toBe(1);
+    expect(envelope.configErrors).toEqual([{ message: expect.stringContaining("--output") }]);
+  });
+});
 
 /** Exercise policy findings through the real CLI and its exit-code contract. */
 async function lintRuleFixture(rule: Record<string, unknown>, files: Record<string, string>) {
