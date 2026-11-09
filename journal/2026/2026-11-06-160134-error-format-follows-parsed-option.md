@@ -16,7 +16,7 @@ the `configErrors` envelope and `--config json` as one line on stderr, both exit
 **Decided:** A lenient re-parse rather than scanning argv or tokens, because a second hand-written
 reading is the defect class being removed. `--config --format json` reports in human format: Node reads
 `--format` as the value of `--config` and rejects that as ambiguous, so either reading is a guess. The
-failure stays exit 2 with a message on stderr, and in 0.3.1 that shape exited 3 with empty stdout, so no
+failure stays exit 2 with a message on stderr, and in 0.3.0 that shape exited 3 with empty stdout, so no
 released caller loses an envelope. No `try/catch` around the lenient parse, because it is reached only
 for `XlinterConfigError`, which means the option table already validated. The change is not
 semver-major: exit codes, envelope shape, and `schemaVersion` do not change, only the channel for exit-2
