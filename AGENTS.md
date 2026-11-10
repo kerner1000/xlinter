@@ -72,7 +72,10 @@ recreated. A new publisher expires unless its first publish succeeds within 2 da
    then rerun only that job with `gh run rerun <run-id> --failed`. It reuses the tarball `build` packed,
    which is kept for 7 days.
 4. Run `npm stage list xlinter`, then `npm stage download <stage-id>` and check what it would ship. If
-   `download` returns `E401`, the `publish` job log lists the tarball contents and shasum.
+   `download` returns `E401`, find the successful `publish` job whose log matches both the staged ID
+   and version. Download the `package` artifact from that run. Compare the `.tgz` file's SHA-1 with
+   the `shasum` in that job's log, then inspect the tarball. If any of these checks cannot be completed
+   or fails, stop before approving.
 5. Run `npm stage approve <stage-id>`, or `npm stage reject <stage-id>` if it is wrong. Approval asks for a
    browser login with 2FA, and `E409` "automated review hasn't finished" means retry in a few minutes.
    Every staged version carries tag `latest` and approving it moves `latest`, so approve in version order.
