@@ -67,11 +67,24 @@ recreated. A new publisher expires unless its first publish succeeds within 2 da
    ```
 
 3. Wait for the `release` workflow. If `build` refuses the source, nothing reached npm. Delete a wrong tag
-   with `git push origin :refs/tags/v<version>` and tag the right commit.
-4. Run `npm stage list xlinter`, then `npm stage download <stage-id>` and check what it would ship.
-5. Run `npm stage approve <stage-id>`, or `npm stage reject <stage-id>` if it is wrong.
-6. Run `npm view xlinter@<version> dist.attestations`. The registry can take a few minutes to show the
+   with `git push origin :refs/tags/v<version>` and tag the right commit. If `publish` fails with
+   `ENEEDAUTH`, npm got no OIDC token and nothing reached npm: check the trusted publisher on npmjs.com,
+   then rerun only that job with `gh run rerun <run-id> --failed`. It reuses the tarball `build` packed,
+   which is kept for 7 days.
+4. Run `npm stage list xlinter`, then `npm stage download <stage-id>` and check what it would ship. If
+   `download` returns `E401`, the `publish` job log lists the tarball contents and shasum.
+5. Run `npm stage approve <stage-id>`, or `npm stage reject <stage-id>` if it is wrong. Approval asks for a
+   browser login with 2FA, and `E409` "automated review hasn't finished" means retry in a few minutes.
+   Every staged version carries tag `latest` and approving it moves `latest`, so approve in version order.
+6. Check that the provenance names the tag and commit. The registry can take a few minutes to show the
    new version.
+
+   ```bash
+   curl -fsS https://registry.npmjs.org/-/npm/v1/attestations/xlinter@<version> \
+     | jq -r '.attestations[] | select(.predicateType == "https://slsa.dev/provenance/v1")
+       | .bundle.dsseEnvelope.payload | @base64d | fromjson | .predicate.buildDefinition
+       | [.externalParameters.workflow.ref, .resolvedDependencies[0].digest.gitCommit] | @tsv'
+   ```
 
 Only `main` can be released; a maintenance branch would need a change to the gate. The workflow's tag
 filter does not match pre-release versions.
@@ -80,6 +93,9 @@ If the workflow cannot run, publish from a fresh detached worktree of the tag: `
 `npm publish --dry-run`, whose output must include the `publish source OK` line twice, then `npm publish`,
 which prompts for 2FA and produces no attestation. `prepublishOnly` applies the same gate there, and it
 does not look at `node_modules`, which is why this starts with `npm ci`.
+
+The gate does not compare the version with what the commit contains. A breaking change needs its version
+bump before any tag, and an older commit on `main` can still be tagged with the version it declares.
 
 The gate catches mistakes rather than deliberate bypasses. `--ignore-scripts`, `ignore-scripts=true` in an
 npm config, and publishing a prebuilt tarball all skip it locally without any message, so do not publish
