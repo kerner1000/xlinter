@@ -58,7 +58,7 @@ export const valueChecks = z.strictObject({
    * The value must be an array with an element deep-equal to this. Unlike
    * `contains`, which stringifies the array and so accepts a prefix of an
    * element, this respects element boundaries — the difference between
-   * accepting and rejecting `…ip=185.98.123.771` for `…ip=185.98.123.77`.
+   * accepting and rejecting `…ip=203.0.113.771` for `…ip=203.0.113.77`.
    */
   containsElement: z.unknown().optional(),
   scan: scanSchema.optional(),

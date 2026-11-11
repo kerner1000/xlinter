@@ -19,5 +19,5 @@ spec:
         publishedService:
           enabled: false
     additionalArguments:
-      - "--providers.kubernetesingress.ingressendpoint.ip=185.98.123.77"
+      - "--providers.kubernetesingress.ingressendpoint.ip=203.0.113.77"
       - "--entrypoints.web.proxyprotocol.insecure"
